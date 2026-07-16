@@ -55,7 +55,7 @@
     label: `${item.day.slice(8, 10)}/${item.day.slice(5, 7)}`,
     spend: item.knownCostNanos / 1_000_000_000
   })));
-  const spendConfig = $derived({ spend: { label: 'known spend', color: primaryColor } });
+  const spendConfig = $derived({ spend: { label: 'spend', color: primaryColor } });
 
   const hourlyByHour = $derived(new Map(hourly.map((item) => [item.hour, item])));
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
@@ -257,7 +257,7 @@
           </div>
           <table class="sr-only">
             <caption>spend by day</caption>
-            <thead><tr><th>day</th><th>known spend</th></tr></thead>
+            <thead><tr><th>day</th><th>spend</th></tr></thead>
             <tbody>{#each daily as item}<tr><td>{item.day}</td><td>{formatMoney(item.knownCostNanos)}</td></tr>{/each}</tbody>
           </table>
         </article>
