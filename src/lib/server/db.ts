@@ -1,13 +1,18 @@
 import type { IngestPayload } from './ingest';
 
 const UPSERT_SESSION = `
-  INSERT INTO sessions (session_key, title, first_seen_ms, last_seen_ms)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO sessions (session_key, title, first_seen_ms, last_seen_ms, title_updated_at_ms)
+  VALUES (?, ?, ?, ?, ?)
   ON CONFLICT(session_key) DO UPDATE SET
-    title = COALESCE(excluded.title, sessions.title),
+    title = CASE
+      WHEN excluded.title_updated_at_ms >= sessions.title_updated_at_ms THEN excluded.title
+      ELSE sessions.title
+    END,
+    title_updated_at_ms = MAX(sessions.title_updated_at_ms, excluded.title_updated_at_ms),
     first_seen_ms = MIN(sessions.first_seen_ms, excluded.first_seen_ms),
     last_seen_ms = MAX(sessions.last_seen_ms, excluded.last_seen_ms)
-  WHERE sessions.title IS NOT COALESCE(excluded.title, sessions.title)
+  WHERE (excluded.title_updated_at_ms >= sessions.title_updated_at_ms
+         AND sessions.title IS NOT excluded.title)
      OR excluded.first_seen_ms < sessions.first_seen_ms
      OR excluded.last_seen_ms > sessions.last_seen_ms
 `;
@@ -86,7 +91,8 @@ export async function applyIngest(
   const statements: D1PreparedStatement[] = [];
   for (const session of payload.sessions) {
     statements.push(db.prepare(UPSERT_SESSION).bind(
-      session.sessionKey, session.title, session.firstSeenMs, session.lastSeenMs
+      session.sessionKey, session.title, session.firstSeenMs, session.lastSeenMs,
+      payload.generatedAtMs
     ));
   }
   for (const event of payload.events) {

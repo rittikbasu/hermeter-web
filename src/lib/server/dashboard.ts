@@ -101,12 +101,14 @@ const SQL = [
      FROM filtered GROUP BY session_key, model
    )
    SELECT totals.sessionKey,
+          session_row.title AS title,
           ranked_source.source,
           ranked.model AS primaryModel,
           totals.firstDay,
           totals.calls,
           totals.knownCostNanos
    FROM session_totals totals
+   JOIN sessions session_row ON session_row.session_key = totals.sessionKey
    JOIN ranked_sources ranked_source
      ON ranked_source.session_key = totals.sessionKey AND ranked_source.sourceRank = 1
    JOIN ranked_models ranked
@@ -246,9 +248,10 @@ export async function loadDashboard(
     const sessionKey = String(row.sessionKey ?? '');
     const source = String(row.source ?? 'unknown');
     const primaryModel = String(row.primaryModel ?? 'unknown model');
+    const title = typeof row.title === 'string' ? row.title : '';
     const aliases = await sessionAliasParts(sessionKey);
     return {
-      label: `${source} · ${primaryModel} · ${shortSessionDate(String(row.firstDay ?? ''))}`,
+      label: title || `${source} · ${primaryModel} · ${shortSessionDate(String(row.firstDay ?? ''))}`,
       aliases,
       source,
       calls: rowNumber(row, 'calls'),

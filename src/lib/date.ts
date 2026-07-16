@@ -1,5 +1,7 @@
 export type DateRange = { from: string; to: string };
 export type Preset = 'today' | 'yesterday' | '7d' | '30d' | 'month';
+export type RangePreset = Preset | 'all';
+export type DateBounds = { firstDay: string; lastDay: string };
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -42,4 +44,17 @@ export function presetRange(preset: Preset, today: string): DateRange {
   if (preset === '7d') return { from: shiftDay(today, -6), to: today };
   if (preset === '30d') return { from: shiftDay(today, -29), to: today };
   return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+
+export function rangeForPreset(preset: RangePreset, bounds: DateBounds): DateRange {
+  if (preset === 'all') return { from: bounds.firstDay, to: bounds.lastDay };
+  return presetRange(preset, bounds.lastDay);
+}
+
+export function presetForRange(range: DateRange, bounds: DateBounds): RangePreset | 'custom' {
+  const presets: RangePreset[] = ['today', 'yesterday', '7d', '30d', 'month', 'all'];
+  return presets.find((preset) => {
+    const candidate = rangeForPreset(preset, bounds);
+    return candidate.from === range.from && candidate.to === range.to;
+  }) ?? 'custom';
 }

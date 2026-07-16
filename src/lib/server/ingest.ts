@@ -15,6 +15,17 @@ const EVENT_ID = /^e_[A-Za-z0-9_-]{22,64}$/;
 const SESSION_ID = /^s_[A-Za-z0-9_-]{22,64}$/;
 const SOURCES = new Set(['cli', 'desktop', 'subagent', 'telegram', 'unknown']);
 const MAX_TIMESTAMP_MS = 253_402_280_999_999;
+const UNSAFE_SESSION_TITLE = [
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/,
+  /(?:\/(?:home|users|root|etc|var|tmp)\/|~[\\/]|[a-z]:[\\/])/i,
+  /(?:^|[\\/])\.env(?:\s|$|[\\/])/i,
+  /\b(?:password|passwd|credential|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|secret)\b\s*(?::|=|\bis\b)\s*\S+/i,
+  /\bbearer\s+[a-z0-9._~+/-]{10,}/i,
+  /-----begin\s+(?:(?:rsa|ec|openssh|encrypted)\s+)?private\s+key-----/i,
+  /\b(?:sk-[a-z0-9_-]{16,}|gh[pousr]_[a-z0-9]{16,}|akia[0-9a-z]{12,})\b/i,
+  /\b[a-z][a-z0-9+.-]{1,15}:\/\//i,
+  /\b[a-z0-9_-]{4,}\.[a-z0-9_-]{10,}\.[a-z0-9_-]{10,}\b/i
+];
 
 export type IngestSession = {
   sessionKey: string;
@@ -93,6 +104,20 @@ function nullableText(value: unknown, label: string, maximum = 300): string | nu
   return text(value, label, maximum);
 }
 
+function sessionTitle(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') throw new Error('title must be a non-empty string up to 160 characters');
+  if (UNSAFE_SESSION_TITLE[0].test(value)) throw new Error('unsafe session title');
+  const title = value.trim().split(/\s+/u).join(' ');
+  if (!title || title.length > 160) {
+    throw new Error('title must be a non-empty string up to 160 characters');
+  }
+  if (UNSAFE_SESSION_TITLE.some((pattern) => pattern.test(title))) {
+    throw new Error('unsafe session title');
+  }
+  return title;
+}
+
 function parseSession(value: unknown): IngestSession {
   const item = record(value, 'session');
   exactFields(item, SESSION_FIELDS, 'session');
@@ -101,8 +126,7 @@ function parseSession(value: unknown): IngestSession {
   const firstSeenMs = timestamp(item.firstSeenMs, 'firstSeenMs');
   const lastSeenMs = timestamp(item.lastSeenMs, 'lastSeenMs');
   if (lastSeenMs < firstSeenMs) throw new Error('lastSeenMs precedes firstSeenMs');
-  if (item.title !== null) throw new Error('title must be null');
-  return { sessionKey, title: null, firstSeenMs, lastSeenMs };
+  return { sessionKey, title: sessionTitle(item.title), firstSeenMs, lastSeenMs };
 }
 
 function parseEvent(value: unknown): IngestEvent {

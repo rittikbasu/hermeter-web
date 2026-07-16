@@ -84,16 +84,59 @@ describe('parseIngestPayload', () => {
     })).toThrow(/invalid source/i);
   });
 
-  it('rejects session titles at the privacy boundary', () => {
-    expect(() => parseIngestPayload({
+  it('accepts bounded session titles selected for public display', () => {
+    const parsed = parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
       coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
-      sessions: [{ ...session, title: '/home/alice/.env credential=do-not-export' }],
+      sessions: [{ ...session, title: 'range calendar redesign' }],
       events: [event]
-    })).toThrow(/title must be null/i);
+    });
+
+    expect(parsed.sessions[0].title).toBe('range calendar redesign');
+  });
+
+  it('normalizes title whitespace and uses the producer UTF-16 limit', () => {
+    const parseTitle = (title: string) => parseIngestPayload({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
+      checkedThroughMs: 1784181600000,
+      complete: true,
+      sessions: [{ ...session, title }],
+      events: [event]
+    }).sessions[0].title;
+
+    expect(parseTitle('  range\n calendar\tredesign  ')).toBe('range calendar redesign');
+    expect(parseTitle('😀'.repeat(80))).toBe('😀'.repeat(80));
+    expect(() => parseTitle('😀'.repeat(81))).toThrow(/160 characters/i);
+    expect(() => parseTitle(' \n\t ')).toThrow(/non-empty/i);
+  });
+
+  it('rejects secret-bearing session titles at the publication boundary', () => {
+    for (const title of [
+      '/home/alice/.env credential=do-not-export',
+      'inspect(`/home/alice/private/key.pem`)',
+      'inspect /root/.ssh/id_rsa',
+      'fetch ftp://private.example/secret',
+      'password is do-not-publish',
+      'Bearer abcdefghijklmnop',
+      '-----BEGIN PRIVATE KEY-----',
+      '-----BEGIN ENCRYPTED PRIVATE KEY-----',
+      'aaaa.bbbbbbbbbbbb.cccccccccccc'
+    ]) {
+      expect(() => parseIngestPayload({
+        schema: 'hermeter.ingest.v1',
+        generatedAtMs: 1784181600000,
+        coveredFromMs: 1783621800000,
+        checkedThroughMs: 1784181600000,
+        complete: true,
+        sessions: [{ ...session, title }],
+        events: [event]
+      })).toThrow(/unsafe session title/i);
+    }
   });
 
   it('rejects timestamps that roll beyond the local four-digit calendar', () => {

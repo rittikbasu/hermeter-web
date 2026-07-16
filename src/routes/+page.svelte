@@ -1,19 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invalidateAll } from '$app/navigation';
-  import { ArrowRight } from '@lucide/svelte';
-  import DateField from '$lib/components/date-field.svelte';
+  import { goto, invalidateAll } from '$app/navigation';
+  import DateRangeField from '$lib/components/date-range-field.svelte';
+  import Avatar from '$lib/components/dither-kit/avatar.svelte';
   import AreaChart from '$lib/components/dither-kit/area-chart.svelte';
   import Area from '$lib/components/dither-kit/area.svelte';
   import BarChart from '$lib/components/dither-kit/bar-chart.svelte';
   import Bar from '$lib/components/dither-kit/bar.svelte';
-  import DitherButton from '$lib/components/dither-kit/button.svelte';
   import Grid from '$lib/components/dither-kit/grid.svelte';
+  import LineChart from '$lib/components/dither-kit/line-chart.svelte';
+  import Line from '$lib/components/dither-kit/line.svelte';
+  import PieChart from '$lib/components/dither-kit/pie-chart.svelte';
+  import Pie from '$lib/components/dither-kit/pie.svelte';
   import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
   import XAxis from '$lib/components/dither-kit/x-axis.svelte';
   import YAxis from '$lib/components/dither-kit/y-axis.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { presetRange, type Preset } from '$lib/date';
+  import * as Select from '$lib/components/ui/select/index.js';
+  import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
   import type { PageData } from './$types';
 
@@ -68,6 +71,26 @@
   })));
   const callsConfig = { calls: { label: 'calls', color: 'green' as const } };
   const barSpendConfig = { spend: { label: 'known spend', color: 'green' as const } };
+  const sourceColors = ['green', 'blue', 'purple', 'orange', 'pink', 'red', 'grey'] as const;
+  const sourceConfig = $derived.by(() => Object.fromEntries(sourceSeries.map((item, index) => [
+    item.source,
+    { label: item.source, color: sourceColors[index % sourceColors.length] }
+  ])));
+  const filterOptions: Array<{ value: RangePreset; label: string }> = [
+    { value: 'today', label: 'today' },
+    { value: 'yesterday', label: 'yesterday' },
+    { value: '7d', label: '7 days' },
+    { value: '30d', label: '30 days' },
+    { value: 'month', label: 'this month' },
+    { value: 'all', label: 'all time' }
+  ];
+  const activePreset = $derived(presetForRange(data.dashboard.range, data.bounds));
+  const activePresetLabel = $derived(
+    activePreset === 'custom'
+      ? 'custom'
+      : filterOptions.find((option) => option.value === activePreset)?.label ?? 'custom'
+  );
+  let avatarSeed = $state('hermeter');
 
   function formatChartMoney(value: number): string {
     if (value === 0) return '$0';
@@ -80,19 +103,18 @@
     return Number.isInteger(value) ? formatNumber(value) : '';
   }
 
-  function hrefFor(preset: Preset | 'all'): string {
-    if (preset === 'all') return `/?from=${data.bounds.firstDay}&to=${data.bounds.lastDay}`;
-    const range = presetRange(preset, data.bounds.lastDay);
-    return `/?from=${range.from}&to=${range.to}`;
+  async function applyRange(range: DateRange): Promise<void> {
+    await goto(`/?from=${range.from}&to=${range.to}`, { noScroll: true, keepFocus: true });
   }
 
-  function selected(preset: Preset | 'all'): boolean {
-    const href = new URL(hrefFor(preset), 'https://local');
-    return href.searchParams.get('from') === data.dashboard.range.from
-      && href.searchParams.get('to') === data.dashboard.range.to;
+  async function changePreset(value: string): Promise<void> {
+    if (!filterOptions.some((option) => option.value === value)) return;
+    await applyRange(rangeForPreset(value as RangePreset, data.bounds));
   }
 
   onMount(() => {
+    const random = crypto.getRandomValues(new Uint32Array(2));
+    avatarSeed = `hermeter-${random[0].toString(36)}-${random[1].toString(36)}`;
     let revision = status.dataRevision;
     const timer = window.setInterval(async () => {
       const response = await fetch('/api/status');
@@ -109,16 +131,15 @@
 
 <svelte:head>
   <title>hermeter / usage pulse</title>
-  <meta name="description" content="private hermes usage and cost dashboard" />
+  <meta name="description" content="hermes usage and cost dashboard" />
   <link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
 <div class="shell">
   <header class="topbar">
     <a class="brand" href="/" aria-label="hermeter home">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span>hermeter</span>
-      <span class="brand-view">usage pulse</span>
+      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={138} size={42} animate bloom="off" /></span>
+      <span class="brand-copy"><strong>hermeter</strong><span class="brand-view">usage pulse</span></span>
     </a>
     <div class="freshness" title={`checked through ${formatTimestamp(status.checkedThroughMs)}`}>
       <span>{status.checkedThroughMs ? `last updated ${updatedTime(status.checkedThroughMs)}` : 'waiting for sync'}</span>
@@ -127,25 +148,24 @@
 
   <main>
     <h1 class="sr-only">hermeter usage pulse</h1>
-    <section class="rangebar" aria-label="date range">
-      <nav class="presets" aria-label="date presets">
-        {#each [['today', 'today'], ['yesterday', 'yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'this month'], ['all', 'all']] as [key, label]}
-          {@const isSelected = selected(key as Preset | 'all')}
-          <Button
-            href={hrefFor(key as Preset | 'all')}
-            variant="ghost"
-            size="sm"
-            class={`preset ${isSelected ? 'active' : ''}`}
-            aria-current={isSelected ? 'page' : undefined}
-          >{label}</Button>
-        {/each}
-      </nav>
-      <form method="GET" class="custom-range">
-        <DateField name="from" label="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} />
-        <span class="range-arrow" aria-hidden="true"><ArrowRight size={15} strokeWidth={1.7} /></span>
-        <DateField name="to" label="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} />
-        <DitherButton type="submit" color="green" variant="solid" class="apply-button">apply</DitherButton>
-      </form>
+    <section class="rangebar" aria-label="date range filters">
+      <DateRangeField
+        from={data.dashboard.range.from}
+        to={data.dashboard.range.to}
+        min={data.bounds.firstDay}
+        max={data.bounds.lastDay}
+        onSelect={applyRange}
+      />
+      <Select.Root type="single" value={activePreset} onValueChange={changePreset}>
+        <Select.Trigger class="filter-trigger" aria-label="date preset">
+          <span>{activePresetLabel}</span>
+        </Select.Trigger>
+        <Select.Content class="filter-content" align="end">
+          {#each filterOptions as option}
+            <Select.Item value={option.value}>{option.label}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
     </section>
 
     {#if summary.calls === 0}
@@ -188,17 +208,10 @@
         </article>
       </section>
 
-      {#if summary.incompleteEvents}
-        <aside class="pricing-notice" aria-label="incomplete pricing warning">
-          <strong>known subtotal only</strong>
-          <span>{summary.incompleteEvents} events have incomplete pricing. the displayed spend is a lower bound, not a total.</span>
-        </aside>
-      {/if}
-
       <section class="primary-grid">
         <article class="panel trend-panel">
           <div class="panel-head">
-            <div><p class="eyebrow">daily known spend</p><h2>cost pulse</h2></div>
+            <div><h2>cost pulse</h2></div>
             <p>{data.dashboard.range.from}<span>→</span>{data.dashboard.range.to}</p>
           </div>
           <div class="trend-chart" aria-hidden="true">
@@ -217,14 +230,14 @@
             </AreaChart>
           </div>
           <table class="sr-only">
-            <caption>daily known spend</caption>
+            <caption>spend by day</caption>
             <thead><tr><th>day</th><th>known spend</th></tr></thead>
             <tbody>{#each daily as item}<tr><td>{item.day}</td><td>{formatMoney(item.knownCostNanos)}</td></tr>{/each}</tbody>
           </table>
         </article>
 
         <article class="panel hourly-panel">
-          <div class="panel-head"><div><p class="eyebrow">local time · ist</p><h2>hourly rhythm</h2></div></div>
+          <div class="panel-head"><div><h2>hourly rhythm</h2></div></div>
           <div class="bar-chart hourly-chart" aria-hidden="true">
             <BarChart data={hours} config={callsConfig} margins={{ top: 18, right: 12, bottom: 28, left: 45 }} bloom="low">
               <Grid strokeDasharray="2 5" />
@@ -245,15 +258,12 @@
 
       <section class="breakdown-grid">
         <article class="panel list-panel">
-          <div class="panel-head"><div><p class="eyebrow">what ran · top 8</p><h2>models</h2></div></div>
-          <div class="bar-chart breakdown-chart" aria-hidden="true">
-            <BarChart data={modelSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
-              <Grid strokeDasharray="2 5" />
-              <XAxis dataKey="label" maxTicks={8} />
-              <YAxis tickCount={3} tickFormatter={formatChartMoney} />
-              <Bar dataKey="spend" variant="dotted" />
+          <div class="panel-head"><div><h2>models</h2></div></div>
+          <div class="breakdown-chart model-line-chart" aria-hidden="true">
+            <LineChart data={modelSeries} config={barSpendConfig} margins={{ top: 18, right: 18, bottom: 18, left: 18 }} bloom="low">
+              <Line dataKey="spend" variant="dotted" />
               <Tooltip labelKey="model" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
-            </BarChart>
+            </LineChart>
           </div>
           <ul class="breakdown-key" aria-label="top model totals">
             {#each modelSeries as item}
@@ -263,19 +273,24 @@
         </article>
 
         <article class="panel list-panel">
-          <div class="panel-head"><div><p class="eyebrow">where it ran</p><h2>sources</h2></div></div>
-          <div class="bar-chart breakdown-chart" aria-hidden="true">
-            <BarChart data={sourceSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
-              <Grid strokeDasharray="2 5" />
-              <XAxis dataKey="label" maxTicks={6} />
-              <YAxis tickCount={3} tickFormatter={formatChartMoney} />
-              <Bar dataKey="spend" variant="dotted" />
-              <Tooltip labelKey="source" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
-            </BarChart>
+          <div class="panel-head"><div><h2>sources</h2></div></div>
+          <div class="breakdown-chart source-pie-chart" aria-hidden="true">
+            <PieChart
+              data={sourceSeries}
+              config={sourceConfig}
+              dataKey="spend"
+              nameKey="source"
+              innerRadius={0.56}
+              margins={{ top: 14, right: 14, bottom: 14, left: 14 }}
+              bloom="low"
+            >
+              <Pie variant="dotted" />
+              <Tooltip valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+            </PieChart>
           </div>
-          <ul class="breakdown-key" aria-label="source totals">
-            {#each sourceSeries as item}
-              <li><span>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
+          <ul class="breakdown-key source-key" aria-label="source totals">
+            {#each sourceSeries as item, index}
+              <li><span><i class={`source-swatch source-swatch-${index % sourceColors.length}`} aria-hidden="true"></i>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
             {/each}
           </ul>
         </article>
@@ -283,7 +298,7 @@
 
       <section class="panel sessions-panel">
         <div class="panel-head">
-          <div><p class="eyebrow">top twenty by known spend</p><h2>expensive sessions</h2></div>
+          <div><h2>expensive sessions</h2></div>
           <p>{sessions.length} shown</p>
         </div>
         <div class="table-wrap">
@@ -307,9 +322,4 @@
       </section>
     {/if}
   </main>
-
-  <footer>
-    <span>local usage facts · calculated pricing</span>
-    <span>latest ingest {formatTimestamp(status.generatedAtMs)}</span>
-  </footer>
 </div>

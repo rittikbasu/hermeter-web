@@ -1,15 +1,14 @@
 # hermeter web
 
-a small private usage dashboard for hermeter. it stores sanitized canonical usage events in cloudflare d1 and renders a compact sveltekit dashboard without a charting library.
+a small usage dashboard for hermeter. it stores sanitized canonical usage events in cloudflare d1 and renders a compact sveltekit dashboard with dither kit components.
 
-> authentication is intentionally absent in this local-testing version. do not expose the worker or `/api/ingest` publicly until access control is added.
+> authentication is intentionally absent. a public deployment exposes dashboard data and allows untrusted ingest attempts; add access control before using it beyond a trusted single-operator setup.
 
 ## what it shows
 
-- known spend and explicit incomplete-pricing warnings
-- api calls, processed tokens, and cache coverage
+- known spend, api calls, processed tokens, and cache coverage
 - daily spend and hourly activity
-- model, source, and expensive-session breakdowns
+- model, source, and expensive-session breakdowns with selected display titles
 - presets and bounded arbitrary date ranges (up to 3,660 inclusive days)
 - complete, partial, stale, and unavailable coverage states
 
@@ -58,18 +57,14 @@ money is transported and stored as integer nanodollars. local day and hour proje
 
 ## privacy boundary
 
-accepted payloads contain analytic metadata only: opaque event/session ids, timestamps, fixed source categories, model labels, token counts, known costs, and pricing-completeness fields.
+accepted payloads contain analytic metadata: opaque event/session ids, timestamps, fixed source categories, model labels, token counts, known costs, pricing-completeness fields, and selected session display titles.
 
-payloads must not contain session titles, prompts, responses, raw messages, tool calls or results, log lines, local filesystem paths, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-null titles and non-allowlisted sources.
+display titles are limited to 160 characters and rejected when they contain blocked control characters, local paths, urls, or credential-like patterns. this filter reduces accidental leakage but cannot prove that a title is public-safe. payloads must not contain prompts, responses, raw messages, tool calls or results, log lines, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-allowlisted fields and sources.
 
-## production later
+## production hardening
 
-before deploying:
+the current deployment is intentionally single-operator and unauthenticated. before using it more broadly:
 
-1. create a production d1 database and replace the placeholder `database_id` in `wrangler.jsonc`.
-2. apply migrations remotely.
-3. add cloudflare access or equivalent authentication to both dashboard reads and ingest writes.
-4. deploy the worker only after authentication is verified.
-5. point the 15-minute hermeter publisher at the authenticated endpoint.
-
-no production database, hostname, scheduler, or worker deployment is created by the local setup.
+1. add cloudflare access or equivalent authentication to dashboard reads.
+2. authenticate and rate-limit ingest writes.
+3. point a scheduled hermeter publisher at the authenticated endpoint.

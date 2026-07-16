@@ -58,7 +58,7 @@ const event = {
   pricingConfidence: 'exact_from_usage', pricingVersion: 'pricelord:test'
 };
 const session = {
-  sessionKey: event.sessionKey, title: null,
+  sessionKey: event.sessionKey, title: 'range calendar redesign',
   firstSeenMs: event.occurredAtMs, lastSeenMs: event.occurredAtMs
 };
 
@@ -79,6 +79,10 @@ describe('applyIngest', () => {
     expect(db.batches).toHaveLength(1);
     expect(db.batches[0]).toHaveLength(2);
     expect(db.batches[0][0].sql).toMatch(/insert into sessions/i);
+    expect(db.batches[0][0].args[1]).toBe('range calendar redesign');
+    expect(db.batches[0][0].args[4]).toBe(1784181600000);
+    expect(db.batches[0][0].sql).toMatch(/title_updated_at_ms/i);
+    expect(db.batches[0][0].sql).not.toMatch(/coalesce\s*\(excluded\.title/i);
     expect(db.batches[0][1].sql).toMatch(/insert into usage_events/i);
     expect(db.runs.at(-1)?.sql).toMatch(/insert into sync_state/i);
     expect(result).toEqual({ acceptedEvents: 1, changed: true });

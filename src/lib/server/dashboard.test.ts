@@ -17,7 +17,8 @@ class FakeDatabase {
       coveredFromMs: Date.parse('2026-07-09T18:30:00Z'),
       checkedThroughMs: Date.parse('2026-07-16T07:00:00Z'),
       dataRevision: 3
-    }
+    },
+    readonly sessionTitle: string | null = 'range calendar redesign'
   ) {}
   prepare(sql: string) { return new FakeStatement(sql); }
   async batch(statements: FakeStatement[]) {
@@ -30,7 +31,7 @@ class FakeDatabase {
       { results: [{ source: 'telegram', calls: 2, processedTokens: 110, knownCostNanos: 123000000 }] },
       { results: [{
         sessionKey: 's_x', source: 'telegram', primaryModel: 'gpt-5.6-sol',
-        firstDay: '2026-07-10', calls: 2, knownCostNanos: 123000000
+        title: this.sessionTitle, firstDay: '2026-07-10', calls: 2, knownCostNanos: 123000000
       }] },
       { results: [this.status] }
     ];
@@ -61,7 +62,7 @@ describe('loadDashboard', () => {
     expect(data.hourly).toHaveLength(1);
     expect(data.models[0].model).toBe('gpt-5.6-sol');
     expect(data.sessions[0]).toMatchObject({
-      label: 'telegram · gpt-5.6-sol · 10 jul',
+      label: 'range calendar redesign',
       source: 'telegram',
       calls: 2,
       knownCostNanos: 123000000
@@ -78,6 +79,16 @@ describe('loadDashboard', () => {
     expect(data.coverage).toEqual({
       state: 'partial', fromDay: '2026-07-10', throughDay: '2026-07-16'
     });
+  });
+
+  it('falls back to a generated label when a session has no public title', async () => {
+    const data = await loadDashboard(
+      new FakeDatabase(undefined, undefined, null) as unknown as D1Database,
+      '2026-07-15',
+      '2026-07-16'
+    );
+
+    expect(data.sessions[0].label).toBe('telegram · gpt-5.6-sol · 10 jul');
   });
 
   it('does not synthesize zero usage before the coverage lower bound', async () => {

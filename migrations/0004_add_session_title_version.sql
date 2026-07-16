@@ -1,0 +1,2 @@
+ALTER TABLE sessions
+ADD COLUMN title_updated_at_ms INTEGER NOT NULL DEFAULT 0;
