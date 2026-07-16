@@ -5,10 +5,14 @@
   import DateField from '$lib/components/date-field.svelte';
   import AreaChart from '$lib/components/dither-kit/area-chart.svelte';
   import Area from '$lib/components/dither-kit/area.svelte';
+  import BarChart from '$lib/components/dither-kit/bar-chart.svelte';
+  import Bar from '$lib/components/dither-kit/bar.svelte';
+  import DitherButton from '$lib/components/dither-kit/button.svelte';
   import Grid from '$lib/components/dither-kit/grid.svelte';
   import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
   import XAxis from '$lib/components/dither-kit/x-axis.svelte';
   import YAxis from '$lib/components/dither-kit/y-axis.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
   import { presetRange, type Preset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
   import type { PageData } from './$types';
@@ -18,7 +22,7 @@
   type Daily = { day: string; calls: number; knownCostNanos: number };
   type Hourly = { day: string; hour: number; calls: number; knownCostNanos: number };
   type Breakdown = { source?: string; provider?: string; model?: string; calls: number; processedTokens: number; knownCostNanos: number };
-  type Session = { sessionKey: string; title: string | null; source: string; calls: number; knownCostNanos: number };
+  type Session = { label: string; alias: string; source: string; calls: number; knownCostNanos: number };
 
   const summary = $derived(data.dashboard.summary);
   const daily = $derived(data.dashboard.daily as Daily[]);
@@ -45,11 +49,28 @@
 
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
     hour,
+    label: String(hour).padStart(2, '0'),
     calls: hourly.filter((item) => item.hour === hour).reduce((sum, item) => sum + item.calls, 0)
   })));
-  const maxHour = $derived(Math.max(...hours.map((item) => item.calls), 1));
-  const maxModel = $derived(Math.max(...models.map((item) => item.knownCostNanos), 1));
-  const maxSource = $derived(Math.max(...sources.map((item) => item.knownCostNanos), 1));
+  const modelSeries = $derived(models.slice(0, 8).map((item, index) => ({
+    label: String(index + 1).padStart(2, '0'),
+    model: item.model ?? 'unknown',
+    spend: item.knownCostNanos / 1_000_000_000
+  })));
+  const sourceSeries = $derived(sources.map((item) => ({
+    label: item.source ?? 'unknown',
+    source: item.source ?? 'unknown',
+    spend: item.knownCostNanos / 1_000_000_000
+  })));
+  const callsConfig = { calls: { label: 'calls', color: 'green' as const } };
+  const barSpendConfig = { spend: { label: 'known spend', color: 'green' as const } };
+
+  function formatChartMoney(value: number): string {
+    if (value === 0) return '$0';
+    if (Math.abs(value) < 1) return `$${value.toFixed(2)}`;
+    if (Math.abs(value) < 10) return `$${value.toFixed(1)}`;
+    return `$${Math.round(value).toLocaleString('en-US')}`;
+  }
 
   function hrefFor(preset: Preset | 'all'): string {
     if (preset === 'all') return `/?from=${data.bounds.firstDay}&to=${data.bounds.lastDay}`;
@@ -101,14 +122,21 @@
     <section class="rangebar" aria-label="date range">
       <nav class="presets" aria-label="date presets">
         {#each [['today', 'today'], ['yesterday', 'yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'this month'], ['all', 'all']] as [key, label]}
-          <a href={hrefFor(key as Preset | 'all')} class:active={selected(key as Preset | 'all')}>{label}</a>
+          {@const isSelected = selected(key as Preset | 'all')}
+          <Button
+            href={hrefFor(key as Preset | 'all')}
+            variant="ghost"
+            size="sm"
+            class={`preset ${isSelected ? 'active' : ''}`}
+            aria-current={isSelected ? 'page' : undefined}
+          >{label}</Button>
         {/each}
       </nav>
       <form method="GET" class="custom-range">
         <DateField name="from" label="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} />
         <span class="range-arrow" aria-hidden="true"><ArrowRight size={15} strokeWidth={1.7} /></span>
         <DateField name="to" label="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} />
-        <button type="submit">apply</button>
+        <DitherButton type="submit" color="green" variant="solid" bloom="low" class="apply-button">apply</DitherButton>
       </form>
     </section>
 
@@ -184,13 +212,14 @@
 
         <article class="panel hourly-panel">
           <div class="panel-head"><div><p class="eyebrow">local time · ist</p><h2>hourly rhythm</h2></div></div>
-          <div class="hour-bars" aria-label="calls by hour">
-            {#each hours as item}
-              <div class="hour" title={`${String(item.hour).padStart(2, '0')}:00 · ${formatNumber(item.calls)} calls`}>
-                <span style={`height: ${Math.max((item.calls / maxHour) * 100, item.calls ? 4 : 1)}%`}></span>
-                {#if item.hour % 6 === 0}<small>{String(item.hour).padStart(2, '0')}</small>{/if}
-              </div>
-            {/each}
+          <div class="bar-chart hourly-chart" aria-label="calls by hour">
+            <BarChart data={hours} config={callsConfig} margins={{ top: 18, right: 12, bottom: 28, left: 45 }} bloom="low">
+              <Grid strokeDasharray="2 5" />
+              <XAxis dataKey="label" maxTicks={6} />
+              <YAxis tickCount={4} tickFormatter={(value) => formatNumber(Math.round(value))} />
+              <Bar dataKey="calls" variant="dotted" />
+              <Tooltip labelKey="label" valueFormatter={(value) => `${formatNumber(value)} calls`} />
+            </BarChart>
           </div>
           <p class="hour-note">activity is aggregated across the selected days</p>
         </article>
@@ -198,28 +227,33 @@
 
       <section class="breakdown-grid">
         <article class="panel list-panel">
-          <div class="panel-head"><div><p class="eyebrow">what ran</p><h2>models</h2></div></div>
-          <div class="bars">
-            {#each models as item}
-              <div class="bar-row">
-                <div class="bar-label"><span>{item.model}</span><small>{formatNumber(item.calls)} {item.calls === 1 ? 'call' : 'calls'}</small></div>
-                <div class="bar-track"><span style={`width: ${(item.knownCostNanos / maxModel) * 100}%`}></span></div>
-                <strong>{formatMoney(item.knownCostNanos)}</strong>
-              </div>
+          <div class="panel-head"><div><p class="eyebrow">what ran · top 8</p><h2>models</h2></div></div>
+          <div class="bar-chart breakdown-chart">
+            <BarChart data={modelSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
+              <Grid strokeDasharray="2 5" />
+              <XAxis dataKey="label" maxTicks={8} />
+              <YAxis tickCount={3} tickFormatter={formatChartMoney} />
+              <Bar dataKey="spend" variant="dotted" />
+              <Tooltip labelKey="model" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+            </BarChart>
+          </div>
+          <div class="model-key" aria-label="model chart key">
+            {#each modelSeries as item}
+              <span><b>{item.label}</b>{item.model}</span>
             {/each}
           </div>
         </article>
 
         <article class="panel list-panel">
           <div class="panel-head"><div><p class="eyebrow">where it ran</p><h2>sources</h2></div></div>
-          <div class="bars">
-            {#each sources as item}
-              <div class="bar-row">
-                <div class="bar-label"><span>{item.source}</span><small>{formatNumber(item.calls)} {item.calls === 1 ? 'call' : 'calls'}</small></div>
-                <div class="bar-track"><span style={`width: ${(item.knownCostNanos / maxSource) * 100}%`}></span></div>
-                <strong>{formatMoney(item.knownCostNanos)}</strong>
-              </div>
-            {/each}
+          <div class="bar-chart breakdown-chart">
+            <BarChart data={sourceSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
+              <Grid strokeDasharray="2 5" />
+              <XAxis dataKey="label" maxTicks={6} />
+              <YAxis tickCount={3} tickFormatter={formatChartMoney} />
+              <Bar dataKey="spend" variant="dotted" />
+              <Tooltip labelKey="source" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+            </BarChart>
           </div>
         </article>
       </section>
@@ -236,8 +270,8 @@
               {#each sessions as item}
                 <tr>
                   <td>
-                    <span class="session-title">{item.title ?? item.sessionKey}</span>
-                    {#if item.title}<small>{item.sessionKey}</small>{/if}
+                    <span class="session-title">{item.label}</span>
+                    <small>{item.alias}</small>
                   </td>
                   <td><span class="source-tag">{item.source}</span></td>
                   <td>{formatNumber(item.calls)}</td>

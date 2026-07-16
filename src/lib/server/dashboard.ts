@@ -71,17 +71,48 @@ const SQL = [
     SUM(known_cost_nanos) AS knownCostNanos
    FROM usage_events WHERE ${RANGE}
    GROUP BY source ORDER BY knownCostNanos DESC`,
-  `SELECT
-    e.session_key AS sessionKey,
-    s.title AS title,
-    MIN(e.source) AS source,
-    COUNT(*) AS calls,
-    SUM(e.known_cost_nanos) AS knownCostNanos
-   FROM usage_events e
-   LEFT JOIN sessions s ON s.session_key = e.session_key
-   WHERE e.local_day >= ? AND e.local_day <= ?
-   GROUP BY e.session_key, s.title
-   ORDER BY knownCostNanos DESC LIMIT 20`,
+  `WITH filtered AS (
+     SELECT session_key, source, model, local_day, known_cost_nanos
+     FROM usage_events WHERE ${RANGE}
+   ),
+   session_totals AS (
+     SELECT session_key AS sessionKey,
+            MIN(local_day) AS firstDay,
+            COUNT(*) AS calls,
+            SUM(known_cost_nanos) AS knownCostNanos
+     FROM filtered GROUP BY session_key
+   ),
+   ranked_sources AS (
+     SELECT session_key,
+            source,
+            ROW_NUMBER() OVER (
+              PARTITION BY session_key
+              ORDER BY COUNT(*) DESC, SUM(known_cost_nanos) DESC, source
+            ) AS sourceRank
+     FROM filtered GROUP BY session_key, source
+   ),
+   ranked_models AS (
+     SELECT session_key,
+            model,
+            ROW_NUMBER() OVER (
+              PARTITION BY session_key
+              ORDER BY SUM(known_cost_nanos) DESC, COUNT(*) DESC, model
+            ) AS modelRank
+     FROM filtered GROUP BY session_key, model
+   )
+   SELECT totals.sessionKey,
+          ranked_source.source,
+          ranked.model AS primaryModel,
+          totals.firstDay,
+          totals.calls,
+          totals.knownCostNanos
+   FROM session_totals totals
+   JOIN ranked_sources ranked_source
+     ON ranked_source.session_key = totals.sessionKey AND ranked_source.sourceRank = 1
+   JOIN ranked_models ranked
+     ON ranked.session_key = totals.sessionKey AND ranked.modelRank = 1
+   ORDER BY totals.knownCostNanos DESC, totals.sessionKey
+   LIMIT 20`,
   `SELECT generated_at_ms AS generatedAtMs,
           covered_from_ms AS coveredFromMs,
           checked_through_ms AS checkedThroughMs,
@@ -116,6 +147,32 @@ function dayInKolkata(milliseconds: number): string | null {
   } catch {
     return null;
   }
+}
+
+const SESSION_WORDS = [
+  'ash', 'birch', 'cedar', 'clover', 'comet', 'coral', 'ember', 'fern',
+  'flint', 'grove', 'harbor', 'iris', 'juniper', 'kite', 'lotus', 'maple',
+  'moss', 'nova', 'olive', 'orbit', 'pine', 'reed', 'river', 'willow'
+] as const;
+
+function sessionAlias(sessionKey: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < sessionKey.length; index += 1) {
+    hash ^= sessionKey.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  const first = SESSION_WORDS[hash % SESSION_WORDS.length];
+  const second = SESSION_WORDS[Math.floor(hash / SESSION_WORDS.length) % SESSION_WORDS.length];
+  const suffix = String(Math.floor(hash / (SESSION_WORDS.length ** 2)) % 1_000_000).padStart(6, '0');
+  return `session ${first}-${second}-${suffix}`;
+}
+
+function shortSessionDate(day: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return 'unknown date';
+  const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][
+    Number(day.slice(5, 7)) - 1
+  ];
+  return `${Number(day.slice(8, 10))} ${month}`;
 }
 
 function nextDay(day: string): string {
@@ -196,13 +253,18 @@ export async function loadDashboard(
     hourly: numericRows(hourlyResult),
     models: numericRows(modelResult),
     sources: numericRows(sourceResult),
-    sessions: resultRows(sessionResult).map((row) => ({
-      sessionKey: String(row.sessionKey ?? ''),
-      title: row.title === null || row.title === undefined ? null : String(row.title),
-      source: String(row.source ?? 'unknown'),
-      calls: rowNumber(row, 'calls'),
-      knownCostNanos: rowNumber(row, 'knownCostNanos')
-    })),
+    sessions: resultRows(sessionResult).map((row) => {
+      const sessionKey = String(row.sessionKey ?? '');
+      const source = String(row.source ?? 'unknown');
+      const primaryModel = String(row.primaryModel ?? 'unknown model');
+      return {
+        label: `${source} · ${primaryModel} · ${shortSessionDate(String(row.firstDay ?? ''))}`,
+        alias: sessionAlias(sessionKey),
+        source,
+        calls: rowNumber(row, 'calls'),
+        knownCostNanos: rowNumber(row, 'knownCostNanos')
+      };
+    }),
     status: {
       generatedAtMs: rowNumber(rawStatus, 'generatedAtMs'),
       coveredFromMs,

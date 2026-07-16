@@ -28,7 +28,10 @@ class FakeDatabase {
       { results: [{ day: '2026-07-16', hour: 12, calls: 2, knownCostNanos: 123000000 }] },
       { results: [{ provider: 'openai', model: 'gpt-5.6-sol', calls: 2, processedTokens: 110, knownCostNanos: 123000000 }] },
       { results: [{ source: 'telegram', calls: 2, processedTokens: 110, knownCostNanos: 123000000 }] },
-      { results: [{ sessionKey: 's_x', title: 'dashboard', source: 'telegram', calls: 2, knownCostNanos: 123000000 }] },
+      { results: [{
+        sessionKey: 's_x', source: 'telegram', primaryModel: 'gpt-5.6-sol',
+        firstDay: '2026-07-10', calls: 2, knownCostNanos: 123000000
+      }] },
       { results: [this.status] }
     ];
   }
@@ -48,7 +51,15 @@ describe('loadDashboard', () => {
     expect(data.daily[0]).toMatchObject({ day: '2026-07-15', calls: 0, knownCostNanos: 0 });
     expect(data.hourly).toHaveLength(1);
     expect(data.models[0].model).toBe('gpt-5.6-sol');
-    expect(data.sessions[0].title).toBe('dashboard');
+    expect(data.sessions[0]).toMatchObject({
+      label: 'telegram · gpt-5.6-sol · 10 jul',
+      source: 'telegram',
+      calls: 2,
+      knownCostNanos: 123000000
+    });
+    expect(data.sessions[0].alias).toMatch(/^session [a-z]+-[a-z]+-\d{6}$/);
+    expect(data.sessions[0]).not.toHaveProperty('sessionKey');
+    expect(data.sessions[0]).not.toHaveProperty('title');
     expect(data.status).toEqual({
       generatedAtMs: Date.parse('2026-07-16T07:00:00Z'),
       coveredFromMs: Date.parse('2026-07-09T18:30:00Z'),
