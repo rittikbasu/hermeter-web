@@ -2,6 +2,13 @@
   import { onMount } from 'svelte';
   import { invalidateAll } from '$app/navigation';
   import { ArrowRight } from '@lucide/svelte';
+  import DateField from '$lib/components/date-field.svelte';
+  import AreaChart from '$lib/components/dither-kit/area-chart.svelte';
+  import Area from '$lib/components/dither-kit/area.svelte';
+  import Grid from '$lib/components/dither-kit/grid.svelte';
+  import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
+  import XAxis from '$lib/components/dither-kit/x-axis.svelte';
+  import YAxis from '$lib/components/dither-kit/y-axis.svelte';
   import { presetRange, type Preset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
   import type { PageData } from './$types';
@@ -29,19 +36,12 @@
     }).format(value);
   }
 
-  const trend = $derived.by(() => {
-    if (!daily.length) return { line: '', area: '', points: [] as Array<readonly [number, number]>, max: 0 };
-    const width = 1000;
-    const floor = 260;
-    const max = Math.max(...daily.map((item) => item.knownCostNanos), 1);
-    const points = daily.map((item, index) => {
-      const x = daily.length === 1 ? width / 2 : (index / (daily.length - 1)) * width;
-      const y = floor - (item.knownCostNanos / max) * 220;
-      return [x, y] as const;
-    });
-    const line = points.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-    return { line, area: `${line} L${points.at(-1)?.[0] ?? 0} ${floor} L${points[0][0]} ${floor} Z`, points, max };
-  });
+  const spendSeries = $derived(daily.map((item) => ({
+    day: item.day,
+    label: item.day.slice(5),
+    spend: item.knownCostNanos / 1_000_000_000
+  })));
+  const spendConfig = { spend: { label: 'known spend', color: 'green' as const } };
 
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
     hour,
@@ -81,6 +81,7 @@
 <svelte:head>
   <title>hermeter / usage pulse</title>
   <meta name="description" content="private hermes usage and cost dashboard" />
+  <link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
 <div class="shell">
@@ -99,14 +100,14 @@
     <h1 class="sr-only">hermeter usage pulse</h1>
     <section class="rangebar" aria-label="date range">
       <nav class="presets" aria-label="date presets">
-        {#each [['today', 'today'], ['yesterday', 'yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'this month'], ['all', 'all tracked']] as [key, label]}
+        {#each [['today', 'today'], ['yesterday', 'yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'this month'], ['all', 'all']] as [key, label]}
           <a href={hrefFor(key as Preset | 'all')} class:active={selected(key as Preset | 'all')}>{label}</a>
         {/each}
       </nav>
       <form method="GET" class="custom-range">
-        <label><span>from</span><input type="date" name="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} /></label>
+        <DateField name="from" label="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} />
         <span class="range-arrow" aria-hidden="true"><ArrowRight size={15} strokeWidth={1.7} /></span>
-        <label><span>to</span><input type="date" name="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} /></label>
+        <DateField name="to" label="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} />
         <button type="submit">apply</button>
       </form>
     </section>
@@ -165,27 +166,19 @@
             <p>{data.dashboard.range.from}<span>→</span>{data.dashboard.range.to}</p>
           </div>
           <div class="trend-chart">
-            <div class="trend-scale" aria-hidden="true"><span>{formatMoney(trend.max)}</span><span>{formatMoney(trend.max / 2)}</span><span>$0</span></div>
-            <svg viewBox="0 0 1000 280" preserveAspectRatio="none" role="img" aria-label="daily known spend trend">
-              <defs>
-                <pattern id="dither" width="12" height="12" patternUnits="userSpaceOnUse">
-                  <circle cx="2" cy="2" r="1.15" fill="var(--accent)" />
-                </pattern>
-              </defs>
-              <line x1="0" y1="260" x2="1000" y2="260" class="axis" />
-              <path d={trend.area} fill="url(#dither)" class="area" />
-              <path d={trend.line} class="line" />
-              {#each trend.points as [x, y], index}
-                <circle class="point" cx={x} cy={y} r="4"><title>{daily[index].day}: {formatMoney(daily[index].knownCostNanos)}</title></circle>
-              {/each}
-            </svg>
-          </div>
-          <div class="trend-labels">
-            {#each daily as item, index}
-              <div style={`left: ${daily.length === 1 ? 50 : (index / (daily.length - 1)) * 100}%`} title={`${item.day}: ${formatMoney(item.knownCostNanos)}`}>
-                <span></span><small>{item.day.slice(5)}</small>
-              </div>
-            {/each}
+            <AreaChart
+              data={spendSeries}
+              config={spendConfig}
+              margins={{ top: 18, right: 18, bottom: 28, left: 54 }}
+              bloom="low"
+              animationDuration={650}
+            >
+              <Grid strokeDasharray="2 5" />
+              <XAxis dataKey="label" maxTicks={7} />
+              <YAxis tickCount={4} tickFormatter={(value) => `$${Math.round(value)}`} />
+              <Area dataKey="spend" variant="dotted" />
+              <Tooltip labelKey="day" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+            </AreaChart>
           </div>
         </article>
 
