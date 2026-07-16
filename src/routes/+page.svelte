@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invalidateAll } from '$app/navigation';
+  import { ArrowRight } from '@lucide/svelte';
   import { presetRange, type Preset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
   import type { PageData } from './$types';
@@ -20,7 +21,13 @@
   const sessions = $derived(data.dashboard.sessions as Session[]);
   const status = $derived(data.dashboard.status);
   const coverage = $derived(data.dashboard.coverage);
-  const stale = $derived(status.checkedThroughMs > 0 && Date.now() - status.checkedThroughMs > 30 * 60 * 1000);
+
+  function updatedTime(value: number): string {
+    if (!value) return 'waiting for sync';
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit'
+    }).format(value);
+  }
 
   const trend = $derived.by(() => {
     if (!daily.length) return { line: '', area: '', points: [] as Array<readonly [number, number]>, max: 0 };
@@ -84,9 +91,7 @@
       <span class="brand-view">usage pulse</span>
     </a>
     <div class="freshness" title={`checked through ${formatTimestamp(status.checkedThroughMs)}`}>
-      <span class="status-dot" class:live={status.checkedThroughMs > 0 && !stale} class:stale></span>
-      <span>{status.checkedThroughMs ? `${stale ? 'stale · ' : 'checked '}${formatTimestamp(status.checkedThroughMs)}` : 'waiting for first sync'}</span>
-      {#if status.checkedThroughMs}<b class:warning={coverage.state !== 'complete'}>{coverage.state}</b>{/if}
+      <span>{status.checkedThroughMs ? `last updated ${updatedTime(status.checkedThroughMs)}` : 'waiting for sync'}</span>
     </div>
   </header>
 
@@ -100,7 +105,7 @@
       </nav>
       <form method="GET" class="custom-range">
         <label><span>from</span><input type="date" name="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} /></label>
-        <span class="range-arrow">→</span>
+        <span class="range-arrow" aria-hidden="true"><ArrowRight size={15} strokeWidth={1.7} /></span>
         <label><span>to</span><input type="date" name="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} /></label>
         <button type="submit">apply</button>
       </form>
