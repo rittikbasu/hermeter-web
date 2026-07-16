@@ -233,7 +233,10 @@
             <tbody>
               {#each sessions as item}
                 <tr>
-                  <td><span class="session-title">{item.title ?? 'untitled session'}</span><small>{item.sessionKey}</small></td>
+                  <td>
+                    <span class="session-title">{item.title ?? item.sessionKey}</span>
+                    {#if item.title}<small>{item.sessionKey}</small>{/if}
+                  </td>
                   <td><span class="source-tag">{item.source}</span></td>
                   <td>{formatNumber(item.calls)}</td>
                   <td>{formatMoney(item.knownCostNanos)}</td>

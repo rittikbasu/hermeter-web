@@ -58,9 +58,9 @@ money is transported and stored as integer nanodollars. local day and hour proje
 
 ## privacy boundary
 
-accepted payloads contain analytic metadata only: opaque event/session ids, timestamps, source/model labels, token counts, known costs, and pricing-completeness fields.
+accepted payloads contain analytic metadata only: opaque event/session ids, timestamps, fixed source categories, model labels, token counts, known costs, and pricing-completeness fields.
 
-payloads must not contain prompts, responses, raw messages, tool calls or results, log lines, local filesystem paths, raw hermes ids, the local identity key, or credentials.
+payloads must not contain session titles, prompts, responses, raw messages, tool calls or results, log lines, local filesystem paths, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-null titles and non-allowlisted sources.
 
 ## production later
 

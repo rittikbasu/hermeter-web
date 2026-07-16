@@ -13,6 +13,7 @@ const EVENT_FIELDS = new Set([
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const EVENT_ID = /^e_[A-Za-z0-9_-]{22,64}$/;
 const SESSION_ID = /^s_[A-Za-z0-9_-]{22,64}$/;
+const SOURCES = new Set(['cli', 'desktop', 'subagent', 'telegram', 'unknown']);
 
 export type IngestSession = {
   sessionKey: string;
@@ -90,7 +91,8 @@ function parseSession(value: unknown): IngestSession {
   const firstSeenMs = integer(item.firstSeenMs, 'firstSeenMs');
   const lastSeenMs = integer(item.lastSeenMs, 'lastSeenMs');
   if (lastSeenMs < firstSeenMs) throw new Error('lastSeenMs precedes firstSeenMs');
-  return { sessionKey, title: nullableText(item.title, 'title'), firstSeenMs, lastSeenMs };
+  if (item.title !== null) throw new Error('title must be null');
+  return { sessionKey, title: null, firstSeenMs, lastSeenMs };
 }
 
 function parseEvent(value: unknown): IngestEvent {
@@ -106,6 +108,8 @@ function parseEvent(value: unknown): IngestEvent {
   if (!DAY.test(localDay)) throw new Error('invalid localDay');
   const localHour = integer(item.localHour, 'localHour');
   if (localHour > 23) throw new Error('localHour must be <= 23');
+  const source = text(item.source, 'source');
+  if (!SOURCES.has(source)) throw new Error('invalid source');
   const inputTokens = integer(item.inputTokens, 'inputTokens');
   const cachedInputTokens = integer(item.cachedInputTokens, 'cachedInputTokens');
   if (cachedInputTokens > inputTokens) throw new Error('cachedInputTokens exceeds inputTokens');
@@ -121,7 +125,7 @@ function parseEvent(value: unknown): IngestEvent {
     kind,
     provider: text(item.provider, 'provider'),
     model: text(item.model, 'model'),
-    source: text(item.source, 'source'),
+    source,
     sessionKey,
     inputTokens,
     cachedInputTokens,

@@ -24,7 +24,7 @@ const event = {
 
 const session = {
   sessionKey: 's_1234567890abcdefghijkl',
-  title: 'dashboard architecture',
+  title: null,
   firstSeenMs: 1784180714000,
   lastSeenMs: 1784180714000
 };
@@ -66,6 +66,28 @@ describe('parseIngestPayload', () => {
       sessions: [session],
       events: [{ ...event, prompt: 'must never be accepted' }]
     })).toThrow(/unknown event field/i);
+  });
+
+  it('rejects raw source identifiers at the privacy boundary', () => {
+    expect(() => parseIngestPayload({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: 1784181600000,
+      checkedThroughMs: 1784181600000,
+      complete: true,
+      sessions: [session],
+      events: [{ ...event, source: 'telegram:raw-chat-id-123' }]
+    })).toThrow(/invalid source/i);
+  });
+
+  it('rejects session titles at the privacy boundary', () => {
+    expect(() => parseIngestPayload({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: 1784181600000,
+      checkedThroughMs: 1784181600000,
+      complete: true,
+      sessions: [{ ...session, title: '/home/alice/.env credential=do-not-export' }],
+      events: [event]
+    })).toThrow(/title must be null/i);
   });
 
   it('rejects oversized event batches', () => {
