@@ -14,7 +14,7 @@
   import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
   import XAxis from '$lib/components/dither-kit/x-axis.svelte';
   import YAxis from '$lib/components/dither-kit/y-axis.svelte';
-  import { PALETTE, rgb, type DitherColor } from '$lib/components/dither-kit/palette';
+  import { PALETTE, rgb, type DitherColor, type Rgb } from '$lib/components/dither-kit/palette';
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
@@ -41,6 +41,10 @@
     return new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit'
     }).format(value);
+  }
+
+  function hexColor([red, green, blue]: Rgb): string {
+    return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
   }
 
   let primaryColor = $state<DitherColor>('green');
@@ -79,9 +83,13 @@
     desktop: 'blue', cli: 'green', subagent: 'purple', telegram: 'orange', unknown: 'grey'
   };
   const primarySeed = $derived(PALETTE[primaryColor]);
+  const primaryHex = $derived(hexColor(primarySeed.fill));
   const primaryStyle = $derived(
-    `--signal:${rgb(primarySeed.fill)};--signal-soft:${rgb(primarySeed.fill, 1, 0.14)}`
+    `--signal:${rgb(primarySeed.fill)};--signal-soft:${rgb(primarySeed.fill, 1, 0.14)};--primary:${rgb(primarySeed.fill)};--ring:${rgb(primarySeed.fill)}`
   );
+  const faviconHref = $derived(`data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="5" fill="#0d0f12"/><path fill="${primaryHex}" d="M7 7h4v4H7zm7 0h4v4h-4zm7 0h4v4h-4zM7 14h4v4H7zm7 0h4v4h-4zm7 0h4v4h-4zM7 21h4v4H7zm7 0h4v4h-4zm7 0h4v4h-4z"/></svg>`
+  )}`);
   const callsConfig = $derived({ calls: { label: 'calls', color: primaryColor } });
   const sourceColor = (source: string): DitherColor => sourceColorMap[source] ?? 'grey';
   const sourceConfig = $derived.by(() => Object.fromEntries(sourceSeries.map((item) => [
@@ -147,16 +155,16 @@
 </script>
 
 <svelte:head>
-  <title>hermeter / usage pulse</title>
+  <title>hermeter</title>
   <meta name="description" content="hermes usage and cost dashboard" />
-  <link rel="icon" href="/favicon.svg" />
+  <link rel="icon" href={faviconHref} />
 </svelte:head>
 
 <div class="shell" style={primaryStyle}>
   <header class="topbar">
     <a class="brand" href="/" aria-label="hermeter home">
-      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={primaryHues[primaryColor]} size={36} animate bloom="off" /></span>
-      <span class="brand-copy"><strong>hermeter</strong><span class="brand-view">usage pulse</span></span>
+      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={primaryHues[primaryColor]} size={28} animate bloom="off" /></span>
+      <strong>hermeter</strong>
     </a>
     <div class="freshness" title={`checked through ${formatTimestamp(status.checkedThroughMs)}`}>
       <span>{status.checkedThroughMs ? `last updated ${updatedTime(status.checkedThroughMs)}` : 'waiting for sync'}</span>
@@ -164,13 +172,14 @@
   </header>
 
   <main>
-    <h1 class="sr-only">hermeter usage pulse</h1>
+    <h1 class="sr-only">hermeter dashboard</h1>
     <section class="rangebar" aria-label="date range filters">
       <DateRangeField
         from={data.dashboard.range.from}
         to={data.dashboard.range.to}
         min={data.bounds.firstDay}
         max={data.bounds.lastDay}
+        accent={rgb(primarySeed.fill)}
         onSelect={applyRange}
       />
       <Select.Root type="single" value={activePreset} onValueChange={changePreset}>
@@ -204,7 +213,7 @@
     {:else}
       <section class="metrics" aria-label="usage summary">
         <article>
-          <p>{summary.incompleteEvents ? 'known subtotal' : 'spend'}</p>
+          <p>subtotal</p>
           <strong>{formatMoney(summary.knownCostNanos)}</strong>
           <small>{summary.incompleteEvents ? `${summary.incompleteEvents} incomplete pricing events` : 'priced from captured usage'}</small>
         </article>
@@ -214,7 +223,7 @@
           <small>{formatNumber(Math.round(summary.calls / Math.max(daily.length, 1)))} per active day</small>
         </article>
         <article>
-          <p>processed</p>
+          <p>tokens processed</p>
           <strong>{formatTokens(summary.processedTokens)}</strong>
           <small>{formatTokens(summary.outputTokens)} output</small>
         </article>
@@ -289,25 +298,27 @@
 
         <article class="panel list-panel source-panel">
           <div class="panel-head"><div><h2>sources</h2></div></div>
-          <div class="breakdown-chart source-pie-chart" aria-hidden="true">
-            <PieChart
-              data={sourceSeries}
-              config={sourceConfig}
-              dataKey="spend"
-              nameKey="source"
-              innerRadius={0.56}
-              margins={{ top: 14, right: 14, bottom: 14, left: 14 }}
-              bloom="low"
-            >
-              <Pie variant="dotted" />
-              <Tooltip valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
-            </PieChart>
+          <div class="source-content">
+            <div class="breakdown-chart source-pie-chart" aria-hidden="true">
+              <PieChart
+                data={sourceSeries}
+                config={sourceConfig}
+                dataKey="spend"
+                nameKey="source"
+                innerRadius={0.56}
+                margins={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                bloom="low"
+              >
+                <Pie variant="dotted" />
+                <Tooltip valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+              </PieChart>
+            </div>
+            <ul class="breakdown-key source-key" aria-label="source totals">
+              {#each sourceSeries as item}
+                <li><span class={`source-label source-${sourceColor(item.source)}`}><i aria-hidden="true"></i>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
+              {/each}
+            </ul>
           </div>
-          <ul class="breakdown-key source-key" aria-label="source totals">
-            {#each sourceSeries as item}
-              <li><span class={`source-label source-${sourceColor(item.source)}`}><i aria-hidden="true"></i>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
-            {/each}
-          </ul>
         </article>
       </section>
 

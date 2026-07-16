@@ -5,23 +5,23 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-	--background: #0a0b0d;
+	--background: #08090b;
 	--foreground: #f0eee8;
-	--card: #101216;
+	--card: #0d0f12;
 	--card-foreground: #f0eee8;
-	--popover: #101216;
+	--popover: #0d0f12;
 	--popover-foreground: #f0eee8;
 	--primary: #28d26e;
 	--primary-foreground: #111507;
-	--secondary: #14171c;
+	--secondary: #111319;
 	--secondary-foreground: #f0eee8;
-	--muted: #1b1e24;
+	--muted: #15181d;
 	--muted-foreground: #9aa1ac;
-	--accent: #1b1e24;
+	--accent: #15181d;
 	--accent-foreground: #f0eee8;
 	--destructive: #ff6b6b;
-	--border: #252932;
-	--input: #343a45;
+	--border: #1d2128;
+	--input: #292e37;
 	--ring: #28d26e;
 	--chart-1: #28d26e;
 	--chart-2: #89d18b;
@@ -29,13 +29,13 @@
 	--chart-4: #477d62;
 	--chart-5: #345848;
 	--radius: 0.45rem;
-	--sidebar: #101216;
+	--sidebar: #0d0f12;
 	--sidebar-foreground: #f0eee8;
 	--sidebar-primary: #28d26e;
 	--sidebar-primary-foreground: #111507;
-	--sidebar-accent: #1b1e24;
+	--sidebar-accent: #15181d;
 	--sidebar-accent-foreground: #f0eee8;
-	--sidebar-border: #252932;
+	--sidebar-border: #1d2128;
 	--sidebar-ring: #28d26e;
 }
 

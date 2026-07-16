@@ -19,12 +19,14 @@
     to,
     min,
     max,
+    accent,
     onSelect
   }: {
     from: string;
     to: string;
     min: string;
     max: string;
+    accent: string;
     onSelect: (range: DateRange) => void | Promise<void>;
   } = $props();
 
@@ -78,7 +80,12 @@
       </Button>
     {/snippet}
   </Popover.Trigger>
-  <Popover.Content align="start" sideOffset={7} class="date-popover range-popover">
+  <Popover.Content
+    align="start"
+    sideOffset={7}
+    class="date-popover range-popover"
+    style={`--primary:${accent};--ring:${accent}`}
+  >
     <RangeCalendar
       value={selected}
       onValueChange={selectRange}
