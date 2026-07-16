@@ -1,8 +1,8 @@
 <script module lang="ts">
-  import { BAYER } from './dither-paint';
-  import { PALETTE, rgb, type DitherColor } from './palette';
+  import { paintColumn } from './dither-paint';
+  import { PALETTE, type DitherColor } from './palette';
 
-  const ROWS = 3;
+  const ROWS = 4;
   const CELL_WIDTH = 2;
 
   function paint(canvas: HTMLCanvasElement, value: number, maximum: number, color: DitherColor): void {
@@ -18,11 +18,12 @@
     context.clearRect(0, 0, columns, ROWS);
     const seed = PALETTE[color];
     for (let x = 0; x < filled; x += 1) {
-      for (let y = 0; y < ROWS; y += 1) {
-        const lit = BAYER[y][x & 3] < 0.72;
-        context.fillStyle = rgb(seed.fill, 1, lit ? 0.95 : 0.32);
-        context.fillRect(x, y, 1, 1);
-      }
+      paintColumn(context, x, 0, ROWS, seed, {
+        variant: 'gradient',
+        intensity: 0,
+        dim: 1,
+        stacked: false
+      });
     }
   }
 </script>
@@ -63,7 +64,7 @@
   .dither-progress-line {
     position: relative;
     width: 100%;
-    height: 6px;
+    height: 8px;
     overflow: hidden;
     background: rgba(116, 123, 135, 0.14);
   }
