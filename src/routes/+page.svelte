@@ -136,7 +136,7 @@
         <DateField name="from" label="from" value={data.dashboard.range.from} min={data.bounds.firstDay} max={data.bounds.lastDay} />
         <span class="range-arrow" aria-hidden="true"><ArrowRight size={15} strokeWidth={1.7} /></span>
         <DateField name="to" label="to" value={data.dashboard.range.to} min={data.bounds.firstDay} max={data.bounds.lastDay} />
-        <DitherButton type="submit" color="green" variant="solid" bloom="low" class="apply-button">apply</DitherButton>
+        <DitherButton type="submit" color="green" variant="solid" class="apply-button">apply</DitherButton>
       </form>
     </section>
 
