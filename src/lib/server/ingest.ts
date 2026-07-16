@@ -14,7 +14,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const EVENT_ID = /^e_[A-Za-z0-9_-]{22,64}$/;
 const SESSION_ID = /^s_[A-Za-z0-9_-]{22,64}$/;
 const SOURCES = new Set(['cli', 'desktop', 'subagent', 'telegram', 'unknown']);
-const MAX_TIMESTAMP_MS = 253_402_300_799_999;
+const MAX_TIMESTAMP_MS = 253_402_280_999_999;
 
 export type IngestSession = {
   sessionKey: string;

@@ -2,12 +2,18 @@ import type { PageServerLoad } from './$types';
 import { presetRange, validateRange } from '$lib/date';
 import { loadDashboard } from '$lib/server/dashboard';
 
-function dayInKolkata(value: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(value);
-  const fields = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${fields.year}-${fields.month}-${fields.day}`;
+function dayInKolkata(value: Date): string | null {
+  if (Number.isNaN(value.valueOf())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(value);
+    const fields = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const day = `${fields.year}-${fields.month}-${fields.day}`;
+    return validateRange(day, day)?.from ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export const load: PageServerLoad = async ({ url, platform, depends, setHeaders }) => {
@@ -34,10 +40,16 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
   const coveredDay = bounds?.checkedThroughMs
     ? dayInKolkata(new Date(bounds.checkedThroughMs))
     : null;
+  const today = dayInKolkata(new Date());
+  if (!today) throw new Error('current date is outside the supported calendar');
   const lastDay = [bounds?.lastEventDay, coveredDay]
     .filter((day): day is string => Boolean(day))
     .sort()
-    .at(-1) ?? dayInKolkata(new Date());
+    .at(-1) ?? today;
+  const firstDay = [bounds?.firstDay, coveredFromDay]
+    .filter((day): day is string => Boolean(day))
+    .sort()
+    .at(0) ?? lastDay;
   const requested = validateRange(
     url.searchParams.get('from') ?? '',
     url.searchParams.get('to') ?? ''
@@ -46,9 +58,6 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
 
   return {
     dashboard: await loadDashboard(platform.env.DB, range.from, range.to),
-    bounds: {
-      firstDay: coveredFromDay ?? bounds?.firstDay ?? lastDay,
-      lastDay
-    }
+    bounds: { firstDay, lastDay }
   };
 };

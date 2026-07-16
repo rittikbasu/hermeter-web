@@ -96,6 +96,18 @@ describe('parseIngestPayload', () => {
     })).toThrow(/title must be null/i);
   });
 
+  it('rejects timestamps that roll beyond the local four-digit calendar', () => {
+    expect(() => parseIngestPayload({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: 253402300799999,
+      coveredFromMs: 253402300799999,
+      checkedThroughMs: 253402300799999,
+      complete: true,
+      sessions: [],
+      events: []
+    })).toThrow(/timestamp/i);
+  });
+
   it('rejects timestamps outside the dashboard date domain', () => {
     expect(() => parseIngestPayload({
       schema: 'hermeter.ingest.v1',
