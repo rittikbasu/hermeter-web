@@ -151,30 +151,6 @@ function dayInKolkata(milliseconds: number): string | null {
   }
 }
 
-const SESSION_WORDS = [
-  'ash', 'birch', 'cedar', 'clover', 'comet', 'coral', 'ember', 'fern',
-  'flint', 'grove', 'harbor', 'iris', 'juniper', 'kite', 'lotus', 'maple',
-  'moss', 'nova', 'olive', 'orbit', 'pine', 'reed', 'river', 'willow'
-] as const;
-
-function digestCode(bytes: Uint8Array, length: number): string {
-  let value = 0n;
-  for (const byte of bytes.slice(0, length)) value = (value << 8n) | BigInt(byte);
-  return value.toString(36).padStart(Math.ceil(length * 8 / Math.log2(36)), '0');
-}
-
-async function sessionAliasParts(sessionKey: string): Promise<{ short: string; full: string }> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sessionKey)));
-  const first = SESSION_WORDS[digest[8] % SESSION_WORDS.length];
-  const second = SESSION_WORDS[digest[9] % SESSION_WORDS.length];
-  const prefix = `session ${first}-${second}-`;
-  return { short: `${prefix}${digestCode(digest, 8)}`, full: `${prefix}${digestCode(digest, 16)}` };
-}
-
-export async function sessionAlias(sessionKey: string): Promise<string> {
-  return (await sessionAliasParts(sessionKey)).short;
-}
-
 function shortSessionDate(day: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return 'unknown date';
   const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][
@@ -253,28 +229,17 @@ export async function loadDashboard(
       : 'partial';
   const daily = fillDaily(numericRows(dailyResult), from, to, coveredFromDay, throughDay)
     .sort((left, right) => String(left.day).localeCompare(String(right.day)));
-  const rawSessions = await Promise.all(resultRows(sessionResult).map(async (row) => {
-    const sessionKey = String(row.sessionKey ?? '');
+  const sessions = resultRows(sessionResult).map((row) => {
     const source = String(row.source ?? 'unknown');
     const primaryModel = String(row.primaryModel ?? 'unknown model');
     const title = typeof row.title === 'string' ? row.title : '';
-    const aliases = await sessionAliasParts(sessionKey);
     return {
       label: sessionDisplayTitle(title, primaryModel, String(row.firstDay ?? '')),
-      aliases,
       source,
       calls: rowNumber(row, 'calls'),
       knownCostNanos: rowNumber(row, 'knownCostNanos')
     };
-  }));
-  const aliasCounts = new Map<string, number>();
-  for (const item of rawSessions) {
-    aliasCounts.set(item.aliases.short, (aliasCounts.get(item.aliases.short) ?? 0) + 1);
-  }
-  const sessions = rawSessions.map(({ aliases, ...item }) => ({
-    ...item,
-    alias: aliasCounts.get(aliases.short) === 1 ? aliases.short : aliases.full
-  }));
+  });
 
   return {
     range: { from, to },

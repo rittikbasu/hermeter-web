@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadDashboard, sessionAlias } from './dashboard';
+import { loadDashboard } from './dashboard';
 
 class FakeStatement {
   constructor(readonly sql: string, readonly args: unknown[] = []) {}
@@ -39,15 +39,6 @@ class FakeDatabase {
 }
 
 describe('loadDashboard', () => {
-  it('generates stable collision-resistant aliases for a large session sample', async () => {
-    const sessionIds = Array.from({ length: 1_600 }, (_, index) => `s_${index.toString(36).padStart(24, '0')}`);
-    const aliases = await Promise.all(sessionIds.map(sessionAlias));
-
-    expect(new Set(aliases)).toHaveLength(sessionIds.length);
-    expect(aliases[0]).toMatch(/^session [a-z]+-[a-z]+-[0-9a-z]{13}$/);
-    expect(await sessionAlias(sessionIds[0])).toBe(aliases[0]);
-  });
-
   it('returns one compact range-shaped view model', async () => {
     const data = await loadDashboard(
       new FakeDatabase() as unknown as D1Database,
@@ -67,7 +58,7 @@ describe('loadDashboard', () => {
       calls: 2,
       knownCostNanos: 123000000
     });
-    expect(data.sessions[0].alias).toMatch(/^session [a-z]+-[a-z]+-[0-9a-z]{13}$/);
+    expect(data.sessions[0]).not.toHaveProperty('alias');
     expect(data.sessions[0]).not.toHaveProperty('sessionKey');
     expect(data.sessions[0]).not.toHaveProperty('title');
     expect(data.status).toEqual({
