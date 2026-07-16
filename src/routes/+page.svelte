@@ -8,13 +8,13 @@
   import BarChart from '$lib/components/dither-kit/bar-chart.svelte';
   import Bar from '$lib/components/dither-kit/bar.svelte';
   import Grid from '$lib/components/dither-kit/grid.svelte';
-  import LineChart from '$lib/components/dither-kit/line-chart.svelte';
-  import Line from '$lib/components/dither-kit/line.svelte';
+  import ProgressLine from '$lib/components/dither-kit/progress-line.svelte';
   import PieChart from '$lib/components/dither-kit/pie-chart.svelte';
   import Pie from '$lib/components/dither-kit/pie.svelte';
   import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
   import XAxis from '$lib/components/dither-kit/x-axis.svelte';
   import YAxis from '$lib/components/dither-kit/y-axis.svelte';
+  import { PALETTE, rgb, type DitherColor } from '$lib/components/dither-kit/palette';
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
@@ -43,25 +43,27 @@
     }).format(value);
   }
 
+  let primaryColor = $state<DitherColor>('green');
+
   const spendSeries = $derived(daily.map((item) => ({
     day: item.day,
-    label: item.day.slice(5),
+    label: `${item.day.slice(8, 10)}/${item.day.slice(5, 7)}`,
     spend: item.knownCostNanos / 1_000_000_000
   })));
-  const spendConfig = { spend: { label: 'known spend', color: 'green' as const } };
+  const spendConfig = $derived({ spend: { label: 'known spend', color: primaryColor } });
 
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
     hour,
     label: String(hour).padStart(2, '0'),
     calls: hourly.filter((item) => item.hour === hour).reduce((sum, item) => sum + item.calls, 0)
   })));
-  const modelSeries = $derived(models.slice(0, 8).map((item, index) => ({
-    label: String(index + 1).padStart(2, '0'),
+  const modelSeries = $derived(models.slice(0, 8).map((item) => ({
     model: item.model ?? 'unknown',
     calls: item.calls,
     knownCostNanos: item.knownCostNanos,
     spend: item.knownCostNanos / 1_000_000_000
   })));
+  const modelMaximum = $derived(Math.max(1, ...modelSeries.map((item) => item.spend)));
   const sourceSeries = $derived(sources.map((item) => ({
     label: item.source ?? 'unknown',
     source: item.source ?? 'unknown',
@@ -69,12 +71,22 @@
     knownCostNanos: item.knownCostNanos,
     spend: item.knownCostNanos / 1_000_000_000
   })));
-  const callsConfig = { calls: { label: 'calls', color: 'green' as const } };
-  const barSpendConfig = { spend: { label: 'known spend', color: 'green' as const } };
-  const sourceColors = ['green', 'blue', 'purple', 'orange', 'pink', 'red', 'grey'] as const;
-  const sourceConfig = $derived.by(() => Object.fromEntries(sourceSeries.map((item, index) => [
+  const primaryColors: DitherColor[] = ['green', 'blue', 'purple', 'pink', 'orange', 'red'];
+  const primaryHues: Record<DitherColor, number> = {
+    green: 138, blue: 212, purple: 256, pink: 322, orange: 31, red: 0, grey: 0
+  };
+  const sourceColorMap: Record<string, DitherColor> = {
+    desktop: 'blue', cli: 'green', subagent: 'purple', telegram: 'orange', unknown: 'grey'
+  };
+  const primarySeed = $derived(PALETTE[primaryColor]);
+  const primaryStyle = $derived(
+    `--signal:${rgb(primarySeed.fill)};--signal-soft:${rgb(primarySeed.fill, 1, 0.14)}`
+  );
+  const callsConfig = $derived({ calls: { label: 'calls', color: primaryColor } });
+  const sourceColor = (source: string): DitherColor => sourceColorMap[source] ?? 'grey';
+  const sourceConfig = $derived.by(() => Object.fromEntries(sourceSeries.map((item) => [
     item.source,
-    { label: item.source, color: sourceColors[index % sourceColors.length] }
+    { label: item.source, color: sourceColor(item.source) }
   ])));
   const filterOptions: Array<{ value: RangePreset; label: string }> = [
     { value: 'today', label: 'today' },
@@ -103,6 +115,10 @@
     return Number.isInteger(value) ? formatNumber(value) : '';
   }
 
+  function formatRangeDay(value: string): string {
+    return `${value.slice(8, 10)}-${value.slice(5, 7)}-${value.slice(0, 4)}`;
+  }
+
   async function applyRange(range: DateRange): Promise<void> {
     await goto(`/?from=${range.from}&to=${range.to}`, { noScroll: true, keepFocus: true });
   }
@@ -114,6 +130,7 @@
 
   onMount(() => {
     const random = crypto.getRandomValues(new Uint32Array(2));
+    primaryColor = primaryColors[random[0] % primaryColors.length];
     avatarSeed = `hermeter-${random[0].toString(36)}-${random[1].toString(36)}`;
     let revision = status.dataRevision;
     const timer = window.setInterval(async () => {
@@ -135,10 +152,10 @@
   <link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
-<div class="shell">
+<div class="shell" style={primaryStyle}>
   <header class="topbar">
     <a class="brand" href="/" aria-label="hermeter home">
-      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={138} size={42} animate bloom="off" /></span>
+      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={primaryHues[primaryColor]} size={36} animate bloom="off" /></span>
       <span class="brand-copy"><strong>hermeter</strong><span class="brand-view">usage pulse</span></span>
     </a>
     <div class="freshness" title={`checked through ${formatTimestamp(status.checkedThroughMs)}`}>
@@ -212,7 +229,7 @@
         <article class="panel trend-panel">
           <div class="panel-head">
             <div><h2>cost pulse</h2></div>
-            <p>{data.dashboard.range.from}<span>→</span>{data.dashboard.range.to}</p>
+            <p>{formatRangeDay(data.dashboard.range.from)}<span>→</span>{formatRangeDay(data.dashboard.range.to)}</p>
           </div>
           <div class="trend-chart" aria-hidden="true">
             <AreaChart
@@ -252,27 +269,25 @@
             <thead><tr><th>hour</th><th>calls</th></tr></thead>
             <tbody>{#each hours as item}<tr><td>{item.label}:00</td><td>{formatNumber(item.calls)}</td></tr>{/each}</tbody>
           </table>
-          <p class="hour-note">activity is aggregated across the selected days</p>
+
         </article>
       </section>
 
       <section class="breakdown-grid">
-        <article class="panel list-panel">
+        <article class="panel list-panel model-panel">
           <div class="panel-head"><div><h2>models</h2></div></div>
-          <div class="breakdown-chart model-line-chart" aria-hidden="true">
-            <LineChart data={modelSeries} config={barSpendConfig} margins={{ top: 18, right: 18, bottom: 18, left: 18 }} bloom="low">
-              <Line dataKey="spend" variant="dotted" />
-              <Tooltip labelKey="model" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
-            </LineChart>
-          </div>
-          <ul class="breakdown-key" aria-label="top model totals">
+          <ul class="model-lines" aria-label="top model totals">
             {#each modelSeries as item}
-              <li><span><b>{item.label}</b>{item.model}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
+              <li>
+                <span class="model-label"><strong>{item.model}</strong><small>{formatNumber(item.calls)} calls</small></span>
+                <ProgressLine value={item.spend} maximum={modelMaximum} color={primaryColor} />
+                <span class="model-value">{formatMoney(item.knownCostNanos)}</span>
+              </li>
             {/each}
           </ul>
         </article>
 
-        <article class="panel list-panel">
+        <article class="panel list-panel source-panel">
           <div class="panel-head"><div><h2>sources</h2></div></div>
           <div class="breakdown-chart source-pie-chart" aria-hidden="true">
             <PieChart
@@ -289,8 +304,8 @@
             </PieChart>
           </div>
           <ul class="breakdown-key source-key" aria-label="source totals">
-            {#each sourceSeries as item, index}
-              <li><span><i class={`source-swatch source-swatch-${index % sourceColors.length}`} aria-hidden="true"></i>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
+            {#each sourceSeries as item}
+              <li><span class={`source-label source-${sourceColor(item.source)}`}><i aria-hidden="true"></i>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
             {/each}
           </ul>
         </article>
@@ -298,20 +313,19 @@
 
       <section class="panel sessions-panel">
         <div class="panel-head">
-          <div><h2>expensive sessions</h2></div>
+          <div><h2>top sessions</h2></div>
           <p>{sessions.length} shown</p>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>session</th><th>source</th><th>calls</th><th>known spend</th></tr></thead>
+            <thead><tr><th>session</th><th>calls</th><th>known spend</th></tr></thead>
             <tbody>
               {#each sessions as item}
                 <tr>
                   <td>
                     <span class="session-title">{item.label}</span>
-                    <small>{item.alias}</small>
+                    <small class={`source-label source-${sourceColor(item.source)}`}><i aria-hidden="true"></i>{item.source}</small>
                   </td>
-                  <td><span class="source-tag">{item.source}</span></td>
                   <td>{formatNumber(item.calls)}</td>
                   <td>{formatMoney(item.knownCostNanos)}</td>
                 </tr>

@@ -183,6 +183,15 @@ function shortSessionDate(day: string): string {
   return `${Number(day.slice(8, 10))} ${month}`;
 }
 
+function sessionDisplayTitle(title: string, primaryModel: string, firstDay: string): string {
+  const cleaned = title
+    .replace(/\bsubagent\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s·|—–-]+|[\s·|—–-]+$/g, '')
+    .trim();
+  return cleaned || `${primaryModel} · ${shortSessionDate(firstDay)}`;
+}
+
 function nextDay(day: string): string {
   const value = new Date(`${day}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + 1);
@@ -251,7 +260,7 @@ export async function loadDashboard(
     const title = typeof row.title === 'string' ? row.title : '';
     const aliases = await sessionAliasParts(sessionKey);
     return {
-      label: title || `${source} · ${primaryModel} · ${shortSessionDate(String(row.firstDay ?? ''))}`,
+      label: sessionDisplayTitle(title, primaryModel, String(row.firstDay ?? '')),
       aliases,
       source,
       calls: rowNumber(row, 'calls'),

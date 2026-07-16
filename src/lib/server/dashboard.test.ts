@@ -88,7 +88,18 @@ describe('loadDashboard', () => {
       '2026-07-16'
     );
 
-    expect(data.sessions[0].label).toBe('telegram · gpt-5.6-sol · 10 jul');
+    expect(data.sessions[0].label).toBe('gpt-5.6-sol · 10 jul');
+  });
+
+  it('removes subagent from a public session display title', async () => {
+    const data = await loadDashboard(
+      new FakeDatabase(undefined, undefined, 'review analytics · subagent') as unknown as D1Database,
+      '2026-07-15',
+      '2026-07-16'
+    );
+
+    expect(data.sessions[0].label).toBe('review analytics');
+    expect(data.sessions[0].source).toBe('telegram');
   });
 
   it('does not synthesize zero usage before the coverage lower bound', async () => {
