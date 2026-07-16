@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { presetRange, validateRange } from '$lib/date';
 import { loadDashboard } from '$lib/server/dashboard';
+import { createTheme } from '$lib/server/theme';
 
 function dayInKolkata(value: Date): string | null {
   if (Number.isNaN(value.valueOf())) return null;
@@ -58,6 +59,7 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
 
   return {
     dashboard: await loadDashboard(platform.env.DB, range.from, range.to),
-    bounds: { firstDay, lastDay }
+    bounds: { firstDay, lastDay },
+    theme: createTheme()
   };
 };

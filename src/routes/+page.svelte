@@ -48,7 +48,9 @@
     return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
   }
 
-  let primaryColor = $state<DitherColor>('green');
+  // Keep the request theme stable when dashboard data invalidates.
+  // svelte-ignore state_referenced_locally
+  let primaryColor = $state<DitherColor>(data.theme.primaryColor);
 
   const spendSeries = $derived(daily.map((item) => ({
     day: item.day,
@@ -77,7 +79,6 @@
     knownCostNanos: item.knownCostNanos,
     spend: item.knownCostNanos / 1_000_000_000
   })));
-  const primaryColors: DitherColor[] = ['green', 'blue', 'purple', 'pink', 'orange', 'red'];
   const primaryHues: Record<DitherColor, number> = {
     green: 138, blue: 212, purple: 256, pink: 322, orange: 31, red: 0, grey: 0
   };
@@ -112,7 +113,8 @@
       ? 'custom'
       : filterOptions.find((option) => option.value === activePreset)?.label ?? 'custom'
   );
-  let avatarSeed = $state('hermeter');
+  // svelte-ignore state_referenced_locally
+  let avatarSeed = $state(data.theme.avatarSeed);
 
   function formatChartMoney(value: number): string {
     if (value === 0) return '$0';
@@ -139,9 +141,6 @@
   }
 
   onMount(() => {
-    const random = crypto.getRandomValues(new Uint32Array(2));
-    primaryColor = primaryColors[random[0] % primaryColors.length];
-    avatarSeed = `hermeter-${random[0].toString(36)}-${random[1].toString(36)}`;
     let revision = status.dataRevision;
     const timer = window.setInterval(async () => {
       const current = await fetchStatusRevision();
@@ -157,7 +156,9 @@
 <svelte:head>
   <title>hermeter</title>
   <meta name="description" content="hermes usage and cost dashboard" />
-  <link rel="icon" href={faviconHref} />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href={faviconHref} />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 </svelte:head>
 
 <div class="shell" style={primaryStyle}>
