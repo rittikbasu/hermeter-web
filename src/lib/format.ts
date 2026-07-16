@@ -5,8 +5,19 @@ const money = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2
 });
 
+const wholeMoney = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0
+});
+
 export function formatMoney(nanodollars: number): string {
   return money.format(nanodollars / 1_000_000_000);
+}
+
+export function formatMobileSubtotal(nanodollars: number): string {
+  const dollars = nanodollars / 1_000_000_000;
+  return Math.abs(dollars) >= 10_000 ? wholeMoney.format(dollars) : money.format(dollars);
 }
 
 export function formatTokens(value: number): string {

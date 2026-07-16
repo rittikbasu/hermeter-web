@@ -17,7 +17,7 @@
   import { PALETTE, rgb, type DitherColor, type Rgb } from '$lib/components/dither-kit/palette';
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
-  import { formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
+  import { formatMobileSubtotal, formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
@@ -25,7 +25,7 @@
   type Daily = { day: string; calls: number; knownCostNanos: number };
   type Hourly = { day: string; hour: number; calls: number; knownCostNanos: number };
   type Breakdown = { source?: string; provider?: string; model?: string; calls: number; processedTokens: number; knownCostNanos: number };
-  type Session = { label: string; alias: string; source: string; calls: number; knownCostNanos: number };
+  type Session = { label: string; source: string; calls: number; knownCostNanos: number };
 
   const summary = $derived(data.dashboard.summary);
   const daily = $derived(data.dashboard.daily as Daily[]);
@@ -163,7 +163,7 @@
 <div class="shell" style={primaryStyle}>
   <header class="topbar">
     <a class="brand" href="/" aria-label="hermeter home">
-      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={primaryHues[primaryColor]} size={28} animate bloom="off" /></span>
+      <span class="brand-avatar" aria-hidden="true"><Avatar name={avatarSeed} hue={primaryHues[primaryColor]} mirror="vertical" size={28} animate bloom="off" /></span>
       <strong>hermeter</strong>
     </a>
     <div class="freshness" title={`checked through ${formatTimestamp(status.checkedThroughMs)}`}>
@@ -214,7 +214,7 @@
       <section class="metrics" aria-label="usage summary">
         <article>
           <p>subtotal</p>
-          <strong>{formatMoney(summary.knownCostNanos)}</strong>
+          <strong><span class="desktop-subtotal">{formatMoney(summary.knownCostNanos)}</span><span class="mobile-subtotal">{formatMobileSubtotal(summary.knownCostNanos)}</span></strong>
           <small>{summary.incompleteEvents ? `${summary.incompleteEvents} incomplete pricing events` : 'priced from captured usage'}</small>
         </article>
         <article>
@@ -263,7 +263,7 @@
         </article>
 
         <article class="panel hourly-panel">
-          <div class="panel-head"><div><h2>hourly rhythm</h2></div></div>
+          <div class="panel-head"><div><h2>hourly rhythm</h2></div><p>api calls · ist</p></div>
           <div class="bar-chart hourly-chart" aria-hidden="true">
             <BarChart data={hours} config={callsConfig} margins={{ top: 18, right: 12, bottom: 28, left: 45 }} bloom="low">
               <Grid strokeDasharray="2 5" />
