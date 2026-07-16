@@ -10,7 +10,7 @@ a small private usage dashboard for hermeter. it stores sanitized canonical usag
 - api calls, processed tokens, and cache coverage
 - daily spend and hourly activity
 - model, source, and expensive-session breakdowns
-- presets and arbitrary date ranges
+- presets and bounded arbitrary date ranges (up to 3,660 inclusive days)
 - complete, partial, stale, and unavailable coverage states
 
 ## local setup
@@ -47,7 +47,7 @@ pnpm peers check
 
 `usage_events` contains one row per real sanitized event. deterministic event ids make retries idempotent and allow corrected events to replace earlier values.
 
-`sync_state` records the latest accepted observation time. a successful scan with no events advances this marker without creating synthetic usage. the dashboard uses it to distinguish:
+`sync_state` records the proven coverage interval from the earliest accepted scan start through the latest accepted check time. a successful complete scan with no events advances coverage and the dashboard revision without creating synthetic usage. the dashboard uses both watermarks to distinguish:
 
 - confirmed zero usage
 - the still-partial current day

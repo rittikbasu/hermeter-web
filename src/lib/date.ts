@@ -2,6 +2,8 @@ export type DateRange = { from: string; to: string };
 export type Preset = 'today' | 'yesterday' | '7d' | '30d' | 'month';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+export const MAX_RANGE_DAYS = 3_660;
 
 function parseDay(value: string): Date | null {
   if (!ISO_DAY.test(value)) return null;
@@ -24,6 +26,7 @@ export function validateRange(from: string, to: string): DateRange | null {
   const start = parseDay(from);
   const end = parseDay(to);
   if (!start || !end || start > end) return null;
+  if (((end.valueOf() - start.valueOf()) / DAY_MS) + 1 > MAX_RANGE_DAYS) return null;
   return { from, to };
 }
 

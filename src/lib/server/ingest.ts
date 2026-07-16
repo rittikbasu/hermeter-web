@@ -1,7 +1,7 @@
 export const MAX_EVENTS_PER_REQUEST = 24;
 
 const PAYLOAD_FIELDS = new Set([
-  'schema', 'generatedAtMs', 'checkedThroughMs', 'complete', 'sessions', 'events'
+  'schema', 'generatedAtMs', 'coveredFromMs', 'checkedThroughMs', 'complete', 'sessions', 'events'
 ]);
 const SESSION_FIELDS = new Set(['sessionKey', 'title', 'firstSeenMs', 'lastSeenMs']);
 const EVENT_FIELDS = new Set([
@@ -14,6 +14,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const EVENT_ID = /^e_[A-Za-z0-9_-]{22,64}$/;
 const SESSION_ID = /^s_[A-Za-z0-9_-]{22,64}$/;
 const SOURCES = new Set(['cli', 'desktop', 'subagent', 'telegram', 'unknown']);
+const MAX_TIMESTAMP_MS = 253_402_300_799_999;
 
 export type IngestSession = {
   sessionKey: string;
@@ -46,6 +47,7 @@ export type IngestEvent = {
 export type IngestPayload = {
   schema: 'hermeter.ingest.v1';
   generatedAtMs: number;
+  coveredFromMs: number;
   checkedThroughMs: number;
   complete: boolean;
   sessions: IngestSession[];
@@ -71,6 +73,14 @@ function integer(value: unknown, label: string, minimum = 0): number {
   return value as number;
 }
 
+function timestamp(value: unknown, label: string): number {
+  const parsed = integer(value, label);
+  if (parsed > MAX_TIMESTAMP_MS) {
+    throw new Error(`${label} timestamp is outside the supported date range`);
+  }
+  return parsed;
+}
+
 function text(value: unknown, label: string, maximum = 160): string {
   if (typeof value !== 'string' || !value || value.length > maximum) {
     throw new Error(`${label} must be a non-empty string up to ${maximum} characters`);
@@ -88,8 +98,8 @@ function parseSession(value: unknown): IngestSession {
   exactFields(item, SESSION_FIELDS, 'session');
   const sessionKey = text(item.sessionKey, 'sessionKey');
   if (!SESSION_ID.test(sessionKey)) throw new Error('invalid sessionKey');
-  const firstSeenMs = integer(item.firstSeenMs, 'firstSeenMs');
-  const lastSeenMs = integer(item.lastSeenMs, 'lastSeenMs');
+  const firstSeenMs = timestamp(item.firstSeenMs, 'firstSeenMs');
+  const lastSeenMs = timestamp(item.lastSeenMs, 'lastSeenMs');
   if (lastSeenMs < firstSeenMs) throw new Error('lastSeenMs precedes firstSeenMs');
   if (item.title !== null) throw new Error('title must be null');
   return { sessionKey, title: null, firstSeenMs, lastSeenMs };
@@ -119,7 +129,7 @@ function parseEvent(value: unknown): IngestEvent {
   }
   return {
     eventId,
-    occurredAtMs: integer(item.occurredAtMs, 'occurredAtMs'),
+    occurredAtMs: timestamp(item.occurredAtMs, 'occurredAtMs'),
     localDay,
     localHour,
     kind,
@@ -152,10 +162,16 @@ export function parseIngestPayload(value: unknown): IngestPayload {
   if (payload.sessions.length > MAX_EVENTS_PER_REQUEST) {
     throw new Error(`sessions must contain at most ${MAX_EVENTS_PER_REQUEST} items`);
   }
+  const generatedAtMs = timestamp(payload.generatedAtMs, 'generatedAtMs');
+  const coveredFromMs = timestamp(payload.coveredFromMs, 'coveredFromMs');
+  const checkedThroughMs = timestamp(payload.checkedThroughMs, 'checkedThroughMs');
+  if (coveredFromMs > checkedThroughMs) throw new Error('coveredFromMs exceeds checkedThroughMs');
+  if (checkedThroughMs > generatedAtMs) throw new Error('checkedThroughMs exceeds generatedAtMs');
   return {
     schema: 'hermeter.ingest.v1',
-    generatedAtMs: integer(payload.generatedAtMs, 'generatedAtMs'),
-    checkedThroughMs: integer(payload.checkedThroughMs, 'checkedThroughMs'),
+    generatedAtMs,
+    coveredFromMs,
+    checkedThroughMs,
     complete: payload.complete,
     sessions: payload.sessions.map(parseSession),
     events: payload.events.map(parseEvent)

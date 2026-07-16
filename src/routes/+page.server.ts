@@ -19,9 +19,18 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
     SELECT
       MIN(local_day) AS firstDay,
       MAX(local_day) AS lastEventDay,
+      (SELECT covered_from_ms FROM sync_state WHERE singleton = 1) AS coveredFromMs,
       (SELECT checked_through_ms FROM sync_state WHERE singleton = 1) AS checkedThroughMs
     FROM usage_events
-  `).first<{ firstDay: string | null; lastEventDay: string | null; checkedThroughMs: number | null }>();
+  `).first<{
+    firstDay: string | null;
+    lastEventDay: string | null;
+    coveredFromMs: number | null;
+    checkedThroughMs: number | null;
+  }>();
+  const coveredFromDay = bounds?.coveredFromMs
+    ? dayInKolkata(new Date(bounds.coveredFromMs))
+    : null;
   const coveredDay = bounds?.checkedThroughMs
     ? dayInKolkata(new Date(bounds.checkedThroughMs))
     : null;
@@ -38,7 +47,7 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
   return {
     dashboard: await loadDashboard(platform.env.DB, range.from, range.to),
     bounds: {
-      firstDay: bounds?.firstDay ?? lastDay,
+      firstDay: coveredFromDay ?? bounds?.firstDay ?? lastDay,
       lastDay
     }
   };

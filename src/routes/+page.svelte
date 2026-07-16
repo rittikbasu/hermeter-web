@@ -111,7 +111,11 @@
         {#if coverage.state === 'unavailable'}
           <p class="eyebrow">range not covered</p>
           <h2>no data yet.</h2>
-          <p>the publisher has only checked through {coverage.throughDay ?? 'no date yet'}; this range is unknown, not zero.</p>
+          <p>known coverage runs from {coverage.fromDay ?? 'no date yet'} through {coverage.throughDay ?? 'no date yet'}; this range is unknown, not zero.</p>
+        {:else if coverage.state === 'partial'}
+          <p class="eyebrow">range partially covered</p>
+          <h2>no measured usage yet.</h2>
+          <p>no usage was found in the covered portion from {coverage.fromDay ?? 'no date yet'} through {coverage.throughDay ?? 'no date yet'}; the rest remains unknown.</p>
         {:else}
           <p class="eyebrow">measured zero usage</p>
           <h2>this range is quiet.</h2>

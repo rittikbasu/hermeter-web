@@ -58,13 +58,14 @@ const event = {
   pricingConfidence: 'exact_from_usage', pricingVersion: 'pricelord:test'
 };
 const session = {
-  sessionKey: event.sessionKey, title: 'dashboard architecture',
+  sessionKey: event.sessionKey, title: null,
   firstSeenMs: event.occurredAtMs, lastSeenMs: event.occurredAtMs
 };
 
 function payload(events = [event]): IngestPayload {
   return {
     schema: 'hermeter.ingest.v1', generatedAtMs: 1784181600000,
+    coveredFromMs: 1783621800000,
     checkedThroughMs: 1784181600000, complete: true,
     sessions: events.length ? [session] : [], events
   };
@@ -89,6 +90,10 @@ describe('applyIngest', () => {
 
     expect(db.batches).toHaveLength(0);
     expect(db.runs).toHaveLength(1);
+    expect(db.runs[0].sql).toMatch(/covered_from_ms/i);
+    expect(db.runs[0].args).toEqual([
+      1784181600000, 1783621800000, 1784181600000, 1, 1, 1
+    ]);
     expect(result).toEqual({ acceptedEvents: 0, changed: false });
   });
 });

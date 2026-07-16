@@ -17,11 +17,13 @@ export type DashboardData = {
   sessions: Array<Record<string, string | number | null>>;
   status: {
     generatedAtMs: number;
+    coveredFromMs: number;
     checkedThroughMs: number;
     dataRevision: number;
   };
   coverage: {
     state: 'complete' | 'partial' | 'unavailable';
+    fromDay: string | null;
     throughDay: string | null;
   };
 };
@@ -81,6 +83,7 @@ const SQL = [
    GROUP BY e.session_key, s.title
    ORDER BY knownCostNanos DESC LIMIT 20`,
   `SELECT generated_at_ms AS generatedAtMs,
+          covered_from_ms AS coveredFromMs,
           checked_through_ms AS checkedThroughMs,
           data_revision AS dataRevision
    FROM sync_state WHERE singleton = 1`
@@ -101,12 +104,18 @@ function numericRows(result: D1Result): Array<Record<string, string | number>> {
 }
 
 function dayInKolkata(milliseconds: number): string | null {
-  if (!milliseconds) return null;
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(new Date(milliseconds));
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  if (!milliseconds || !Number.isFinite(milliseconds)) return null;
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.valueOf())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return null;
+  }
 }
 
 function nextDay(day: string): string {
@@ -119,17 +128,25 @@ function fillDaily(
   rows: Array<Record<string, string | number>>,
   from: string,
   to: string,
+  coveredFromDay: string | null,
   throughDay: string | null
 ): Array<Record<string, string | number>> {
-  if (!throughDay || from > throughDay) return rows;
+  if (
+    !coveredFromDay || !throughDay || coveredFromDay > throughDay
+    || to < coveredFromDay || from > throughDay
+  ) return rows;
+  const start = from > coveredFromDay ? from : coveredFromDay;
   const end = to < throughDay ? to : throughDay;
   const byDay = new Map(rows.map((row) => [String(row.day), row]));
-  const output: Array<Record<string, string | number>> = [];
-  for (let day = from; day <= end; day = nextDay(day)) {
+  const output = rows.filter((row) => String(row.day) < start || String(row.day) > end);
+  let day = start;
+  while (true) {
     output.push(byDay.get(day) ?? {
       day, calls: 0, inputTokens: 0, cachedInputTokens: 0,
       outputTokens: 0, knownCostNanos: 0, incompleteEvents: 0
     });
+    if (day === end) break;
+    day = nextDay(day);
   }
   return output;
 }
@@ -150,14 +167,18 @@ export async function loadDashboard(
   const cachedInputTokens = rowNumber(rawSummary, 'cachedInputTokens');
   const outputTokens = rowNumber(rawSummary, 'outputTokens');
   const rawStatus = resultRows(statusResult)[0] ?? {};
+  const coveredFromMs = rowNumber(rawStatus, 'coveredFromMs');
   const checkedThroughMs = rowNumber(rawStatus, 'checkedThroughMs');
+  const coveredFromDay = dayInKolkata(coveredFromMs);
   const throughDay = dayInKolkata(checkedThroughMs);
-  const coverageState = !throughDay || from > throughDay
+  const coverageState = !coveredFromDay || !throughDay || coveredFromDay > throughDay
+    || to < coveredFromDay || from > throughDay
     ? 'unavailable'
-    : to < throughDay
+    : from >= coveredFromDay && to < throughDay
       ? 'complete'
       : 'partial';
-  const daily = fillDaily(numericRows(dailyResult), from, to, throughDay);
+  const daily = fillDaily(numericRows(dailyResult), from, to, coveredFromDay, throughDay)
+    .sort((left, right) => String(left.day).localeCompare(String(right.day)));
 
   return {
     range: { from, to },
@@ -184,9 +205,10 @@ export async function loadDashboard(
     })),
     status: {
       generatedAtMs: rowNumber(rawStatus, 'generatedAtMs'),
+      coveredFromMs,
       checkedThroughMs,
       dataRevision: rowNumber(rawStatus, 'dataRevision')
     },
-    coverage: { state: coverageState, throughDay }
+    coverage: { state: coverageState, fromDay: coveredFromDay, throughDay }
   };
 }

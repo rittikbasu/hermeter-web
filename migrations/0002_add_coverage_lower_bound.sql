@@ -1,0 +1,2 @@
+ALTER TABLE sync_state
+ADD COLUMN covered_from_ms INTEGER NOT NULL DEFAULT 0;

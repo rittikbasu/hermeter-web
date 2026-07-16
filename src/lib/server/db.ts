@@ -57,10 +57,17 @@ const UPSERT_EVENT = `
 
 const UPSERT_SYNC = `
   INSERT INTO sync_state (
-    singleton, generated_at_ms, checked_through_ms, data_revision
-  ) VALUES (1, ?, ?, ?)
+    singleton, generated_at_ms, covered_from_ms, checked_through_ms, data_revision
+  ) VALUES (1, ?, ?, ?, ?)
   ON CONFLICT(singleton) DO UPDATE SET
     generated_at_ms = MAX(sync_state.generated_at_ms, excluded.generated_at_ms),
+    covered_from_ms = CASE
+      WHEN ? = 1 THEN CASE
+        WHEN sync_state.covered_from_ms = 0 THEN excluded.covered_from_ms
+        ELSE MIN(sync_state.covered_from_ms, excluded.covered_from_ms)
+      END
+      ELSE sync_state.covered_from_ms
+    END,
     checked_through_ms = CASE
       WHEN ? = 1 THEN MAX(sync_state.checked_through_ms, excluded.checked_through_ms)
       ELSE sync_state.checked_through_ms
@@ -96,8 +103,10 @@ export async function applyIngest(
   const complete = payload.complete ? 1 : 0;
   await db.prepare(UPSERT_SYNC).bind(
     payload.generatedAtMs,
+    payload.complete ? payload.coveredFromMs : 0,
     payload.complete ? payload.checkedThroughMs : 0,
-    changed ? 1 : 0,
+    changed || payload.complete ? 1 : 0,
+    complete,
     complete
   ).run();
 

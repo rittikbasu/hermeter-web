@@ -34,6 +34,7 @@ describe('parseIngestPayload', () => {
     const parsed = parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
       sessions: [session],
@@ -41,6 +42,7 @@ describe('parseIngestPayload', () => {
     });
 
     expect(parsed.events).toEqual([event]);
+    expect(parsed.coveredFromMs).toBe(1783621800000);
     expect(parsed.complete).toBe(true);
   });
 
@@ -48,6 +50,7 @@ describe('parseIngestPayload', () => {
     const parsed = parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
       sessions: [],
@@ -61,6 +64,7 @@ describe('parseIngestPayload', () => {
     expect(() => parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
       sessions: [session],
@@ -72,6 +76,7 @@ describe('parseIngestPayload', () => {
     expect(() => parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
       sessions: [session],
@@ -83,6 +88,7 @@ describe('parseIngestPayload', () => {
     expect(() => parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: true,
       sessions: [{ ...session, title: '/home/alice/.env credential=do-not-export' }],
@@ -90,11 +96,24 @@ describe('parseIngestPayload', () => {
     })).toThrow(/title must be null/i);
   });
 
+  it('rejects timestamps outside the dashboard date domain', () => {
+    expect(() => parseIngestPayload({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: Number.MAX_SAFE_INTEGER,
+      coveredFromMs: Number.MAX_SAFE_INTEGER,
+      checkedThroughMs: Number.MAX_SAFE_INTEGER,
+      complete: true,
+      sessions: [],
+      events: []
+    })).toThrow(/timestamp/i);
+  });
+
   it('rejects oversized event batches', () => {
     expect(MAX_EVENTS_PER_REQUEST).toBe(24);
     expect(() => parseIngestPayload({
       schema: 'hermeter.ingest.v1',
       generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
       checkedThroughMs: 1784181600000,
       complete: false,
       sessions: [],
