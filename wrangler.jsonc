@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "hermeter",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "06f9b728-a4b5-42da-bdff-9149557ffb55",
       "migrations_dir": "migrations"
     }
   ]
