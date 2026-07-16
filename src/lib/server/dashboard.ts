@@ -50,12 +50,11 @@ const SQL = [
    FROM usage_events WHERE ${RANGE}
    GROUP BY local_day ORDER BY local_day`,
   `SELECT
-    local_day AS day,
     local_hour AS hour,
     COUNT(*) AS calls,
     SUM(known_cost_nanos) AS knownCostNanos
    FROM usage_events WHERE ${RANGE}
-   GROUP BY local_day, local_hour ORDER BY local_day, local_hour`,
+   GROUP BY local_hour ORDER BY local_hour`,
   `SELECT
     provider,
     model,

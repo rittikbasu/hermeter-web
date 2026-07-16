@@ -18,12 +18,13 @@
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import { formatMobileSubtotal, formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
+  import { fetchStatusRevision } from '$lib/status';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
 
   type Daily = { day: string; calls: number; knownCostNanos: number };
-  type Hourly = { day: string; hour: number; calls: number; knownCostNanos: number };
+  type Hourly = { hour: number; calls: number; knownCostNanos: number };
   type Breakdown = { source?: string; provider?: string; model?: string; calls: number; processedTokens: number; knownCostNanos: number };
   type Session = { label: string; source: string; calls: number; knownCostNanos: number };
 
@@ -56,10 +57,11 @@
   })));
   const spendConfig = $derived({ spend: { label: 'known spend', color: primaryColor } });
 
+  const hourlyByHour = $derived(new Map(hourly.map((item) => [item.hour, item])));
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
     hour,
     label: String(hour).padStart(2, '0'),
-    calls: hourly.filter((item) => item.hour === hour).reduce((sum, item) => sum + item.calls, 0)
+    calls: hourlyByHour.get(hour)?.calls ?? 0
   })));
   const modelSeries = $derived(models.slice(0, 8).map((item) => ({
     model: item.model ?? 'unknown',
@@ -142,11 +144,9 @@
     avatarSeed = `hermeter-${random[0].toString(36)}-${random[1].toString(36)}`;
     let revision = status.dataRevision;
     const timer = window.setInterval(async () => {
-      const response = await fetch('/api/status');
-      if (!response.ok) return;
-      const current = await response.json() as { dataRevision: number };
-      if (current.dataRevision !== revision) {
-        revision = current.dataRevision;
+      const current = await fetchStatusRevision();
+      if (current !== null && current !== revision) {
+        revision = current;
         await invalidateAll();
       }
     }, 60_000);

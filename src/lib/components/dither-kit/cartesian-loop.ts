@@ -2,6 +2,7 @@
 // Framework-free: reads live chart state through `{ current }` views.
 
 import type { CartesianChartState } from "./chart-context.svelte"
+import { createBloomSync } from "./bloom-sync"
 import {
   easeInOutCubic,
   paintColumn,
@@ -57,6 +58,9 @@ export function startCartesianLoop({
     bloomCanvas.width = cols
     bloomCanvas.height = rows
   }
+  const syncBloom = bloomCtx
+    ? createBloomSync(bloomCtx, canvas, cols, rows)
+    : null
 
   const reduce = prefersReducedMotion()
   const EASE = reduce ? 1 : 0.18
@@ -112,15 +116,8 @@ export function startCartesianLoop({
     raf = requestAnimationFrame(draw)
     const s = state.current
     if (!s.ready) return
-    // Keep the bloom layer in sync with the crisp canvas while it's active.
-    if (bloomCtx) {
-      const on =
-        s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart || s.hovered)
-      if (on) {
-        bloomCtx.clearRect(0, 0, cols, rows)
-        bloomCtx.drawImage(canvas, 0, 0)
-      }
-    }
+    const bloomOn =
+      s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart || s.hovered)
     const tgt = targets.current
     if (s.revision !== lastRevision) {
       lastRevision = s.revision
@@ -204,8 +201,10 @@ export function startCartesianLoop({
         progChanged ||
         sigChanged
       )
-    )
+    ) {
+      syncBloom?.(bloomOn, false)
       return
+    }
     if (progChanged) {
       lastProg = prog
       needsFill = true
@@ -274,6 +273,7 @@ export function startCartesianLoop({
         c.fillRect(sx, sy + 1, 1, 1)
       }
     }
+    syncBloom?.(bloomOn, true)
   }
 
   raf = requestAnimationFrame(draw)

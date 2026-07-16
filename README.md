@@ -2,7 +2,7 @@
 
 a small usage dashboard for hermeter. it stores sanitized canonical usage events in cloudflare d1 and renders a compact sveltekit dashboard with dither kit components.
 
-> authentication is intentionally absent. a public deployment exposes dashboard data and allows untrusted ingest attempts; add access control before using it beyond a trusted single-operator setup.
+> local development is unauthenticated. the canonical deployment uses separate cloudflare access policies for human dashboard access and service-token-authenticated ingest.
 
 ## what it shows
 
@@ -61,10 +61,12 @@ accepted payloads contain analytic metadata: opaque event/session ids, timestamp
 
 display titles are limited to 160 characters and rejected when they contain blocked control characters, local paths, urls, or credential-like patterns. this filter reduces accidental leakage but cannot prove that a title is public-safe. payloads must not contain prompts, responses, raw messages, tool calls or results, log lines, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-allowlisted fields and sources.
 
-## production hardening
+## production access
 
-the current deployment is intentionally single-operator and unauthenticated. before using it more broadly:
+the canonical deployment is private behind cloudflare access:
 
-1. add cloudflare access or equivalent authentication to dashboard reads.
-2. authenticate and rate-limit ingest writes.
-3. point a scheduled hermeter publisher at the authenticated endpoint.
+- dashboard routes require the allowed human identity.
+- `/api/ingest` requires a scoped access service token.
+- `workers.dev` and preview urls are disabled in `wrangler.jsonc`, leaving the access-protected custom domain as the public route.
+
+the app intentionally has no session or account system of its own. deployments on another domain must recreate both edge policies before accepting real data.

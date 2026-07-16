@@ -23,10 +23,12 @@ class FakeDatabase {
   prepare(sql: string) { return new FakeStatement(sql); }
   async batch(statements: FakeStatement[]) {
     expect(statements).toHaveLength(7);
+    expect(statements[2].sql).toMatch(/GROUP BY local_hour/i);
+    expect(statements[2].sql).not.toMatch(/GROUP BY local_day/i);
     return [
       { results: [{ calls: 2, inputTokens: 100, cachedInputTokens: 80, outputTokens: 10, knownCostNanos: 123000000, incompleteEvents: 1 }] },
       { results: this.daily },
-      { results: [{ day: '2026-07-16', hour: 12, calls: 2, knownCostNanos: 123000000 }] },
+      { results: [{ hour: 12, calls: 2, knownCostNanos: 123000000 }] },
       { results: [{ provider: 'openai', model: 'gpt-5.6-sol', calls: 2, processedTokens: 110, knownCostNanos: 123000000 }] },
       { results: [{ source: 'telegram', calls: 2, processedTokens: 110, knownCostNanos: 123000000 }] },
       { results: [{

@@ -6,6 +6,7 @@ import {
   OFF_TIER,
   prefersReducedMotion,
 } from "./dither-paint"
+import { createBloomSync } from "./bloom-sync"
 import { rgb } from "./palette"
 import { sliceAtAngle } from "./polar"
 import type { PolarChartState } from "./polar-context.svelte"
@@ -54,6 +55,9 @@ export function startPieLoop({
     bloomCanvas.width = cols
     bloomCanvas.height = rows
   }
+  const syncBloom = bloomCtx
+    ? createBloomSync(bloomCtx, canvas, cols, rows)
+    : null
 
   const reduce = prefersReducedMotion()
   const animate = state.current.animate && !reduce
@@ -132,13 +136,7 @@ export function startPieLoop({
     raf = requestAnimationFrame(draw)
     const s = state.current
     if (!s.ready || !s.pie) return
-    if (bloomCtx) {
-      const on = s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart)
-      if (on) {
-        bloomCtx.clearRect(0, 0, cols, rows)
-        bloomCtx.drawImage(canvas, 0, 0)
-      }
-    }
+    const bloomOn = s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart)
     if (s.revision !== lastRevision) {
       lastRevision = s.revision
       animStart = 0
@@ -182,8 +180,12 @@ export function startPieLoop({
       needsFill = true
     }
 
-    if (!needsFill) return
+    if (!needsFill) {
+      syncBloom?.(bloomOn, false)
+      return
+    }
     paint(prog)
+    syncBloom?.(bloomOn, true)
     needsFill = false
   }
 

@@ -15,12 +15,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     return json({ error: 'payload too large' }, { status: 413 });
   }
 
+  let payload: ReturnType<typeof parseIngestPayload>;
   try {
-    const payload = parseIngestPayload(JSON.parse(body));
-    const result = await applyIngest(platform.env.DB, payload);
-    return json({ ok: true, ...result, checkedThroughMs: payload.checkedThroughMs });
+    payload = parseIngestPayload(JSON.parse(body));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid payload';
     return json({ error: message }, { status: 400 });
+  }
+
+  try {
+    const result = await applyIngest(platform.env.DB, payload);
+    return json({ ok: true, ...result, checkedThroughMs: payload.checkedThroughMs });
+  } catch {
+    return json({ error: 'ingest temporarily unavailable' }, { status: 503 });
   }
 };

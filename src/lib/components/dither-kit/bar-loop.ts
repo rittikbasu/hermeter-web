@@ -1,6 +1,7 @@
 // requestAnimationFrame paint loop for the bar canvas.
 
 import type { CartesianChartState } from "./chart-context.svelte"
+import { createBloomSync } from "./bloom-sync"
 import {
   clamp01,
   easeOutCubic,
@@ -53,6 +54,9 @@ export function startBarLoop({
     bloomCanvas.width = cols
     bloomCanvas.height = rows
   }
+  const syncBloom = bloomCtx
+    ? createBloomSync(bloomCtx, canvas, cols, rows)
+    : null
 
   const reduce = prefersReducedMotion()
   const animate = state.current.animate && !reduce
@@ -114,14 +118,8 @@ export function startBarLoop({
     raf = requestAnimationFrame(draw)
     const s = state.current
     if (!s.ready) return
-    if (bloomCtx) {
-      const on =
-        s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart || s.hovered)
-      if (on) {
-        bloomCtx.clearRect(0, 0, cols, rows)
-        bloomCtx.drawImage(canvas, 0, 0)
-      }
-    }
+    const bloomOn =
+      s.bloom !== "off" && (!s.bloomOnHover || s.isMouseInChart || s.hovered)
     if (s.revision !== lastRevision) {
       lastRevision = s.revision
       animStart = 0 // re-play the wave on data change / replay
@@ -158,8 +156,12 @@ export function startBarLoop({
       needsFill = true
     }
 
-    if (!needsFill) return
+    if (!needsFill) {
+      syncBloom?.(bloomOn, false)
+      return
+    }
     paint(prog)
+    syncBloom?.(bloomOn, true)
     needsFill = false
   }
 
