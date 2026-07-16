@@ -55,11 +55,15 @@
   const modelSeries = $derived(models.slice(0, 8).map((item, index) => ({
     label: String(index + 1).padStart(2, '0'),
     model: item.model ?? 'unknown',
+    calls: item.calls,
+    knownCostNanos: item.knownCostNanos,
     spend: item.knownCostNanos / 1_000_000_000
   })));
   const sourceSeries = $derived(sources.map((item) => ({
     label: item.source ?? 'unknown',
     source: item.source ?? 'unknown',
+    calls: item.calls,
+    knownCostNanos: item.knownCostNanos,
     spend: item.knownCostNanos / 1_000_000_000
   })));
   const callsConfig = { calls: { label: 'calls', color: 'green' as const } };
@@ -70,6 +74,10 @@
     if (Math.abs(value) < 1) return `$${value.toFixed(2)}`;
     if (Math.abs(value) < 10) return `$${value.toFixed(1)}`;
     return `$${Math.round(value).toLocaleString('en-US')}`;
+  }
+
+  function formatChartCalls(value: number): string {
+    return Number.isInteger(value) ? formatNumber(value) : '';
   }
 
   function hrefFor(preset: Preset | 'all'): string {
@@ -193,7 +201,7 @@
             <div><p class="eyebrow">daily known spend</p><h2>cost pulse</h2></div>
             <p>{data.dashboard.range.from}<span>→</span>{data.dashboard.range.to}</p>
           </div>
-          <div class="trend-chart">
+          <div class="trend-chart" aria-hidden="true">
             <AreaChart
               data={spendSeries}
               config={spendConfig}
@@ -203,24 +211,34 @@
             >
               <Grid strokeDasharray="2 5" />
               <XAxis dataKey="label" maxTicks={7} />
-              <YAxis tickCount={4} tickFormatter={(value) => `$${Math.round(value)}`} />
+              <YAxis tickCount={4} tickFormatter={formatChartMoney} />
               <Area dataKey="spend" variant="dotted" />
               <Tooltip labelKey="day" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
             </AreaChart>
           </div>
+          <table class="sr-only">
+            <caption>daily known spend</caption>
+            <thead><tr><th>day</th><th>known spend</th></tr></thead>
+            <tbody>{#each daily as item}<tr><td>{item.day}</td><td>{formatMoney(item.knownCostNanos)}</td></tr>{/each}</tbody>
+          </table>
         </article>
 
         <article class="panel hourly-panel">
           <div class="panel-head"><div><p class="eyebrow">local time · ist</p><h2>hourly rhythm</h2></div></div>
-          <div class="bar-chart hourly-chart" aria-label="calls by hour">
+          <div class="bar-chart hourly-chart" aria-hidden="true">
             <BarChart data={hours} config={callsConfig} margins={{ top: 18, right: 12, bottom: 28, left: 45 }} bloom="low">
               <Grid strokeDasharray="2 5" />
               <XAxis dataKey="label" maxTicks={6} />
-              <YAxis tickCount={4} tickFormatter={(value) => formatNumber(Math.round(value))} />
+              <YAxis tickCount={4} tickFormatter={formatChartCalls} />
               <Bar dataKey="calls" variant="dotted" />
               <Tooltip labelKey="label" valueFormatter={(value) => `${formatNumber(value)} calls`} />
             </BarChart>
           </div>
+          <table class="sr-only">
+            <caption>calls by local hour in ist</caption>
+            <thead><tr><th>hour</th><th>calls</th></tr></thead>
+            <tbody>{#each hours as item}<tr><td>{item.label}:00</td><td>{formatNumber(item.calls)}</td></tr>{/each}</tbody>
+          </table>
           <p class="hour-note">activity is aggregated across the selected days</p>
         </article>
       </section>
@@ -228,7 +246,7 @@
       <section class="breakdown-grid">
         <article class="panel list-panel">
           <div class="panel-head"><div><p class="eyebrow">what ran · top 8</p><h2>models</h2></div></div>
-          <div class="bar-chart breakdown-chart">
+          <div class="bar-chart breakdown-chart" aria-hidden="true">
             <BarChart data={modelSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
               <Grid strokeDasharray="2 5" />
               <XAxis dataKey="label" maxTicks={8} />
@@ -237,16 +255,16 @@
               <Tooltip labelKey="model" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
             </BarChart>
           </div>
-          <div class="model-key" aria-label="model chart key">
+          <ul class="breakdown-key" aria-label="top model totals">
             {#each modelSeries as item}
-              <span><b>{item.label}</b>{item.model}</span>
+              <li><span><b>{item.label}</b>{item.model}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
             {/each}
-          </div>
+          </ul>
         </article>
 
         <article class="panel list-panel">
           <div class="panel-head"><div><p class="eyebrow">where it ran</p><h2>sources</h2></div></div>
-          <div class="bar-chart breakdown-chart">
+          <div class="bar-chart breakdown-chart" aria-hidden="true">
             <BarChart data={sourceSeries} config={barSpendConfig} margins={{ top: 16, right: 12, bottom: 28, left: 49 }} bloom="low">
               <Grid strokeDasharray="2 5" />
               <XAxis dataKey="label" maxTicks={6} />
@@ -255,6 +273,11 @@
               <Tooltip labelKey="source" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
             </BarChart>
           </div>
+          <ul class="breakdown-key" aria-label="source totals">
+            {#each sourceSeries as item}
+              <li><span>{item.source}</span><small>{formatNumber(item.calls)} calls · {formatMoney(item.knownCostNanos)}</small></li>
+            {/each}
+          </ul>
         </article>
       </section>
 

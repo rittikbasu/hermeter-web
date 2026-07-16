@@ -86,9 +86,11 @@ main { padding: 22px 0 48px; }
 
 .list-panel { min-height: 355px; }
 .breakdown-chart { height: 230px; padding: 8px 10px 4px; }
-.model-key { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; padding: 0 20px 18px; }
-.model-key span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-text); font-size: 10px; }
-.model-key b { margin-right: 7px; color: var(--signal); font: 600 9px "SFMono-Regular", Consolas, monospace; }
+.breakdown-key { display: grid; gap: 7px; margin: 0; padding: 0 20px 18px; list-style: none; }
+.breakdown-key li { min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.breakdown-key li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-text); font-size: 10px; }
+.breakdown-key small { flex: none; color: var(--faint); font: 9px "SFMono-Regular", Consolas, monospace; white-space: nowrap; }
+.breakdown-key b { margin-right: 7px; color: var(--signal); font: 600 9px "SFMono-Regular", Consolas, monospace; }
 
 .sessions-panel { margin-top: 14px; }
 .table-wrap { overflow-x: auto; }
@@ -147,7 +149,7 @@ footer { height: 62px; display: flex; justify-content: space-between; align-item
   .trend-chart { height: 250px; padding: 8px 6px 10px; }
   .hourly-chart { padding-inline: 4px; }
   .breakdown-chart { height: 210px; padding-inline: 4px; }
-  .model-key { grid-template-columns: 1fr; padding: 0 16px 16px; }
+  .breakdown-key { padding: 0 16px 16px; }
   .sessions-panel th, .sessions-panel td { padding-inline: 14px; }
   .sessions-panel th:nth-child(2), .sessions-panel td:nth-child(2) { display: none; }
   footer { align-items: flex-start; height: auto; padding: 18px 0; gap: 8px; flex-direction: column; }
