@@ -109,10 +109,11 @@ describe('parseIngestPayload', () => {
       events: [event]
     }).sessions[0].title;
 
-    expect(parseTitle('  range\n calendar\tredesign  ')).toBe('range calendar redesign');
+    expect(parseTitle('  range\u2003 calendar  redesign  ')).toBe('range calendar redesign');
+    expect(parseTitle('feat: redesign filters')).toBe('feat: redesign filters');
     expect(parseTitle('😀'.repeat(80))).toBe('😀'.repeat(80));
     expect(() => parseTitle('😀'.repeat(81))).toThrow(/160 characters/i);
-    expect(() => parseTitle(' \n\t ')).toThrow(/non-empty/i);
+    expect(() => parseTitle(' \n\t ')).toThrow(/unsafe session title/i);
   });
 
   it('rejects secret-bearing session titles at the publication boundary', () => {
@@ -120,12 +121,20 @@ describe('parseIngestPayload', () => {
       '/home/alice/.env credential=do-not-export',
       'inspect(`/home/alice/private/key.pem`)',
       'inspect /root/.ssh/id_rsa',
+      'inspect /opt/app/config.yaml',
       'fetch ftp://private.example/secret',
+      'email mailto:alice@example.com',
+      'decode data:text/plain,private',
       'password is do-not-publish',
       'Bearer abcdefghijklmnop',
       '-----BEGIN PRIVATE KEY-----',
       '-----BEGIN ENCRYPTED PRIVATE KEY-----',
-      'aaaa.bbbbbbbbbbbb.cccccccccccc'
+      '-----BEGIN DSA PRIVATE KEY-----',
+      'aaaa.bbbbbbbbbbbb.cccccccccccc',
+      'line\nbreak',
+      'tab\tbreak',
+      'c1\u0085control',
+      'bidi\u202esecret'
     ]) {
       expect(() => parseIngestPayload({
         schema: 'hermeter.ingest.v1',
