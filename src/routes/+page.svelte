@@ -18,7 +18,7 @@
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import { formatMobileSubtotal, formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
-  import { fetchStatusRevision } from '$lib/status';
+  import { fetchStatusVersion } from '$lib/status';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
@@ -141,11 +141,11 @@
   }
 
   onMount(() => {
-    let revision = status.dataRevision;
+    let version = `${status.dataRevision}:${status.checkedThroughMs}`;
     const timer = window.setInterval(async () => {
-      const current = await fetchStatusRevision();
-      if (current !== null && current !== revision) {
-        revision = current;
+      const current = await fetchStatusVersion();
+      if (current !== null && current !== version) {
+        version = current;
         await invalidateAll();
       }
     }, 60_000);

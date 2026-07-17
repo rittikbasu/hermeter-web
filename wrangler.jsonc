@@ -16,6 +16,12 @@
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare"
   },
+  "kv_namespaces": [
+    {
+      "binding": "SNAPSHOTS",
+      "id": "42936a1c4ef345d88ed65096b884030e"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

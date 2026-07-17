@@ -1,6 +1,6 @@
 # hermeter web
 
-a small usage dashboard for hermeter. it stores sanitized canonical usage events in cloudflare d1 and renders a compact sveltekit dashboard with dither kit components.
+a small usage dashboard for hermeter. it reads one sanitized aggregate snapshot from cloudflare workers kv and renders a compact sveltekit dashboard with dither kit components.
 
 > local development is unauthenticated. the canonical deployment uses separate cloudflare access policies for human dashboard access and service-token-authenticated ingest.
 
@@ -16,22 +16,31 @@ a small usage dashboard for hermeter. it stores sanitized canonical usage events
 
 ```bash
 pnpm install
-pnpm db:migrate
 pnpm build
-pnpm cf:dev -- --port 8787
+pnpm cf:dev --port 8787
 ```
 
-open `http://127.0.0.1:8787`.
-
-publish data from the hermeter repository:
+open `http://127.0.0.1:8787`, then publish data from the hermeter repository:
 
 ```bash
-uv run hermeter publish \
-  --url http://127.0.0.1:8787/api/ingest \
-  --from 2026-07-07
+HERMETER_PUBLISH_URL=http://127.0.0.1:8787/api/ingest \
+  uv run hermeter publish
 ```
 
-use `--from` only for the initial backfill. later runs should omit it so the publisher uses its saved cursor and one-hour retry overlap.
+local wrangler development uses a local kv namespace and d1 database. apply migrations before starting a fresh database:
+
+```bash
+pnpm exec wrangler d1 migrations apply hermeter --local
+```
+
+production requires the `SNAPSHOTS` kv and `DB` d1 bindings in `wrangler.jsonc`. for this migration, pause scheduled publication and use this exact rollout order:
+
+1. apply remote d1 migrations.
+2. deploy the worker.
+3. run `uv run hermeter publish --force-snapshot` from the hermeter repository and verify `/api/status` plus `/api/dashboard`.
+4. resume scheduled publication.
+
+the forced full publication is required because an empty authority row cannot be seeded by a heartbeat.
 
 ## verification
 
@@ -44,22 +53,23 @@ pnpm peers check
 
 ## data model
 
-`usage_events` contains one row per real sanitized event. deterministic event ids make retries idempotent and allow corrected events to replace earlier values.
+kv stores complete analytical snapshots under unique immutable `hermeter:snapshot:v2:*` keys that include their revision and content hash. each snapshot is a readable sparse cube keyed by local day, hour, provider, model, fixed source category, and opaque session key. each bucket contains calls, token totals, known cost, and incomplete-pricing counts. selected sanitized titles are stored separately by opaque session key.
 
-`sync_state` records the proven coverage interval from the earliest accepted scan start through the latest accepted check time. a successful complete scan with no events advances coverage and the dashboard revision without creating synthetic usage. the dashboard uses both watermarks to distinguish:
+full uploads write their versioned kv object before one small d1 control row can point to it. that row stores only the authoritative kv key, analytical content hash, revision, and coverage/freshness timestamps—never the full snapshot. d1 primary compare-and-swap serializes monotonic acceptance and rejects reused revisions with changed content. delayed or cancelled writers can leave only harmless orphan keys; they cannot overwrite the key selected by d1.
 
-- confirmed zero usage
-- the still-partial current day
-- stale publication
-- ranges the publisher has not covered
+readers fetch the exact key selected by d1 and verify its revision, content hash, coverage, and freshness bounds before use. every versioned object has a 30-day ttl, so rejected or interrupted candidates expire without request-time garbage collection. unchanged publications verify and refresh the selected key's ttl before advancing freshness in d1; this keeps the live object durable while old selected keys and orphan candidates expire automatically.
 
-money is transported and stored as integer nanodollars. local day and hour projections use `Asia/Kolkata`.
+coverage timestamps distinguish confirmed zero usage, the still-partial current day, stale publication, and ranges outside retained history. money is transported and stored as integer nanodollars. local day and hour projections use `Asia/Kolkata`.
+
+legacy d1 analytics modules and the old canonical kv snapshot remain temporarily for a zero-downtime rollout: `hermeter.ingest.v1` payloads still write event rows, and readers use the canonical kv value only while the authority row is empty. the page falls back to legacy event rows only when that pre-seed canonical snapshot is absent. once authority is seeded, missing, corrupt, or mismatched versioned kv fails visibly rather than exposing stale analytics.
 
 ## privacy boundary
 
-accepted payloads contain analytic metadata: opaque event/session ids, timestamps, fixed source categories, model labels, token counts, known costs, pricing-completeness fields, and selected session display titles.
+the versioned snapshot path contains aggregate analytic metadata: opaque session ids, local day/hour buckets, fixed source categories, model labels, token counts, known costs, pricing-completeness counts, coverage timestamps, and selected session display titles.
 
-display titles are limited to 160 characters and rejected when they contain blocked control characters, local paths, urls, or credential-like patterns. this filter reduces accidental leakage but cannot prove that a title is public-safe. payloads must not contain prompts, responses, raw messages, tool calls or results, log lines, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-allowlisted fields and sources.
+during the temporary rollout window, legacy `hermeter.ingest.v1` remains accepted and persists event-level rows in d1. those rows include opaque event ids, token and known-cost fields, plus pricing confidence/version metadata. the versioned snapshot path itself contains no event rows, event ids, or pricing internals; the legacy path will be removed after rollout verification.
+
+display titles are limited to 160 characters and rejected when they contain blocked control characters, local paths including unc shares, urls including unambiguous schemeless urls, or credential-like patterns. provider and model labels pass the same credential/path/url filter. these filters reduce accidental leakage but cannot prove that a label is public-safe. no accepted path may contain prompts, responses, raw messages, tool calls or results, log lines, raw source or hermes ids, the local identity key, or credentials. the ingest validator rejects non-allowlisted fields and sources.
 
 ## production access
 

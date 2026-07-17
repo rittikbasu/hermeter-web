@@ -84,6 +84,32 @@ describe('parseIngestPayload', () => {
     })).toThrow(/invalid source/i);
   });
 
+  it('rejects credential-shaped provider and model labels', () => {
+    const payload = (changed: Record<string, unknown>) => ({
+      schema: 'hermeter.ingest.v1',
+      generatedAtMs: 1784181600000,
+      coveredFromMs: 1783621800000,
+      checkedThroughMs: 1784181600000,
+      complete: true,
+      sessions: [session],
+      events: [{ ...event, ...changed }]
+    });
+    expect(() => parseIngestPayload(payload({ model: 'sk-abcdefghijklmnop' })))
+      .toThrow(/unsafe model/i);
+    expect(() => parseIngestPayload(payload({ provider: 'api_key=legacy-secret' })))
+      .toThrow(/unsafe provider/i);
+    expect(() => parseIngestPayload(payload({ model: 'OPENAI_API_KEY=legacy-secret' })))
+      .toThrow(/unsafe model/i);
+    expect(() => parseIngestPayload(payload({ provider: 'www.internal.example/users/alice' })))
+      .toThrow(/unsafe provider/i);
+    expect(() => parseIngestPayload(payload({ model: '\\\\server\\users\\alice\\secret.txt' })))
+      .toThrow(/unsafe model/i);
+    expect(() => parseIngestPayload(payload({ provider: 'api.openai.com' })))
+      .toThrow(/unsafe provider/i);
+    expect(() => parseIngestPayload(payload({ model: 'internal.corp' })))
+      .toThrow(/unsafe model/i);
+  });
+
   it('accepts bounded session titles selected for public display', () => {
     const parsed = parseIngestPayload({
       schema: 'hermeter.ingest.v1',
@@ -125,6 +151,10 @@ describe('parseIngestPayload', () => {
       'fetch ftp://private.example/secret',
       'email mailto:alice@example.com',
       'decode data:text/plain,private',
+      'visit www.internal.example/users/alice',
+      'visit api.openai.com',
+      'inspect //server/share',
+      'inspect \\\\server\\users\\alice\\secret.txt',
       'password is do-not-publish',
       'Bearer abcdefghijklmnop',
       '-----BEGIN PRIVATE KEY-----',

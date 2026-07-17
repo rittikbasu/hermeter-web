@@ -18,14 +18,18 @@ const MAX_TIMESTAMP_MS = 253_402_280_999_999;
 const UNSAFE_SESSION_TITLE_CONTROL = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/u;
 const UNSAFE_SESSION_TITLE = [
   /(?:^|[^a-z0-9._~/-])\/(?!\/)(?:[^/\s]+\/)*[^/\s]+/i,
+  /\/\/[a-z0-9._-]+(?:\/[^\s]*)?/i,
   /~[\\/]/,
   /[a-z]:[\\/]/i,
+  /(?:^|[^\\])\\\\[^\\\s]+\\[^\s]+/,
   /(?:^|[^a-z0-9_])\.env(?:$|[^a-z0-9_])/i,
-  /\b(?:password|passwd|credential|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|secret)\b\s*(?::|=|\bis\b)\s*\S+/i,
+  /(?:^|[^a-z0-9])(?:password|passwd|credential|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|secret)\b\s*(?::|=|\bis\b)\s*\S+/i,
   /\bbearer\s+[a-z0-9._~+/-]{10,}/i,
   /-----begin\s+(?:[a-z0-9-]+\s+)*private\s+key-----/i,
   /\b(?:sk-[a-z0-9_-]{16,}|gh[pousr]_[a-z0-9]{16,}|akia[0-9a-z]{12,})\b/i,
   /\b(?:https?|file|ftp|ftps|ssh|sftp|mailto|data|tel|urn|ws|wss|gemini|ipfs):/i,
+  /\b(?:www\.[a-z0-9-]+(?:\.[a-z0-9-]+)+|[a-z0-9-]+(?:\.[a-z0-9-]+)+\/)\S*/i,
+  /\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,24}\b/i,
   /\b[a-z0-9_-]{4,}\.[a-z0-9_-]{10,}\.[a-z0-9_-]{10,}\b/i
 ];
 
@@ -101,6 +105,15 @@ function text(value: unknown, label: string, maximum = 160): string {
   return value;
 }
 
+function publicLabel(value: unknown, label: string): string {
+  const parsed = text(value, label);
+  if (
+    UNSAFE_SESSION_TITLE_CONTROL.test(parsed)
+    || UNSAFE_SESSION_TITLE.some((pattern) => pattern.test(parsed))
+  ) throw new Error(`unsafe ${label}`);
+  return parsed;
+}
+
 function nullableText(value: unknown, label: string, maximum = 300): string | null {
   if (value === null) return null;
   return text(value, label, maximum);
@@ -159,8 +172,8 @@ function parseEvent(value: unknown): IngestEvent {
     localDay,
     localHour,
     kind,
-    provider: text(item.provider, 'provider'),
-    model: text(item.model, 'model'),
+    provider: publicLabel(item.provider, 'provider'),
+    model: publicLabel(item.model, 'model'),
     source,
     sessionKey,
     inputTokens,

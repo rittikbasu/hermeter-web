@@ -1,6 +1,12 @@
 import type { PageServerLoad } from './$types';
 import { presetRange, validateRange } from '$lib/date';
 import { loadDashboard } from '$lib/server/dashboard';
+import {
+  D1SnapshotAuthorityPersistence,
+  loadVerifiedSnapshot
+} from '$lib/server/ordered-snapshot-store';
+import { buildDashboardPageData } from '$lib/server/page-data';
+import { SnapshotUnavailableError } from '$lib/server/snapshot-store';
 import { createTheme } from '$lib/server/theme';
 
 function dayInKolkata(value: Date): string | null {
@@ -17,12 +23,12 @@ function dayInKolkata(value: Date): string | null {
   }
 }
 
-export const load: PageServerLoad = async ({ url, platform, depends, setHeaders }) => {
-  depends('hermeter:dashboard');
-  setHeaders({ 'cache-control': 'private, no-store' });
-  if (!platform?.env.DB) throw new Error('D1 binding is unavailable');
-
-  const bounds = await platform.env.DB.prepare(`
+async function buildLegacyPageData(
+  db: D1Database,
+  search: URLSearchParams,
+  today: string
+) {
+  const bounds = await db.prepare(`
     SELECT
       MIN(local_day) AS firstDay,
       MAX(local_day) AS lastEventDay,
@@ -38,12 +44,10 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
   const coveredFromDay = bounds?.coveredFromMs
     ? dayInKolkata(new Date(bounds.coveredFromMs))
     : null;
-  const coveredDay = bounds?.checkedThroughMs
+  const checkedThroughDay = bounds?.checkedThroughMs
     ? dayInKolkata(new Date(bounds.checkedThroughMs))
     : null;
-  const today = dayInKolkata(new Date());
-  if (!today) throw new Error('current date is outside the supported calendar');
-  const lastDay = [bounds?.lastEventDay, coveredDay]
+  const lastDay = [bounds?.lastEventDay, checkedThroughDay]
     .filter((day): day is string => Boolean(day))
     .sort()
     .at(-1) ?? today;
@@ -51,15 +55,37 @@ export const load: PageServerLoad = async ({ url, platform, depends, setHeaders 
     .filter((day): day is string => Boolean(day))
     .sort()
     .at(0) ?? lastDay;
-  const requested = validateRange(
-    url.searchParams.get('from') ?? '',
-    url.searchParams.get('to') ?? ''
-  );
+  const requested = validateRange(search.get('from') ?? '', search.get('to') ?? '');
   const range = requested ?? presetRange('7d', lastDay);
-
   return {
-    dashboard: await loadDashboard(platform.env.DB, range.from, range.to),
-    bounds: { firstDay, lastDay },
-    theme: createTheme()
+    dashboard: await loadDashboard(db, range.from, range.to),
+    bounds: { firstDay, lastDay }
   };
+}
+
+export const load: PageServerLoad = async ({ url, platform, depends, setHeaders }) => {
+  depends('hermeter:dashboard');
+  setHeaders({ 'cache-control': 'private, no-store' });
+  const today = dayInKolkata(new Date());
+  if (!today) throw new Error('current date is outside the supported calendar');
+  const snapshots = platform?.env.SNAPSHOTS;
+  const db = platform?.env.DB;
+  if (!snapshots) {
+    if (!db) throw new Error('dashboard storage bindings are unavailable');
+    return { ...(await buildLegacyPageData(db, url.searchParams, today)), theme: createTheme() };
+  }
+  if (!db) throw new Error('dashboard storage bindings are unavailable');
+  try {
+    const snapshot = await loadVerifiedSnapshot(
+      new D1SnapshotAuthorityPersistence(db),
+      snapshots
+    );
+    return {
+      ...buildDashboardPageData(snapshot, url.searchParams, today),
+      theme: createTheme()
+    };
+  } catch (error) {
+    if (!(error instanceof SnapshotUnavailableError) || !db) throw error;
+    return { ...(await buildLegacyPageData(db, url.searchParams, today)), theme: createTheme() };
+  }
 };

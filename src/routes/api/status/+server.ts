@@ -1,16 +1,23 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import {
+  D1SnapshotAuthorityPersistence,
+  loadVerifiedSnapshotMetadata
+} from '$lib/server/ordered-snapshot-store';
 
 export const GET: RequestHandler = async ({ platform }) => {
-  if (!platform?.env.DB) return json({ error: 'database unavailable' }, { status: 503 });
-  const status = await platform.env.DB.prepare(`
-    SELECT generated_at_ms AS generatedAtMs,
-           covered_from_ms AS coveredFromMs,
-           checked_through_ms AS checkedThroughMs,
-           data_revision AS dataRevision
-    FROM sync_state WHERE singleton = 1
-  `).first();
-  return json(status ?? { generatedAtMs: 0, coveredFromMs: 0, checkedThroughMs: 0, dataRevision: 0 }, {
-    headers: { 'cache-control': 'private, no-store' }
-  });
+  if (!platform?.env.SNAPSHOTS || !platform.env.DB) {
+    return json({ error: 'snapshot store unavailable' }, { status: 503 });
+  }
+  try {
+    const status = await loadVerifiedSnapshotMetadata(
+      new D1SnapshotAuthorityPersistence(platform.env.DB),
+      platform.env.SNAPSHOTS
+    );
+    return json(status, {
+      headers: { 'cache-control': 'private, no-store' }
+    });
+  } catch {
+    return json({ error: 'status temporarily unavailable' }, { status: 503 });
+  }
 };
