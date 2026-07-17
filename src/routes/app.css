@@ -114,9 +114,11 @@ main { padding: 22px 0 48px; }
 .session-title { display: block; max-width: 720px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sessions-panel td small { margin-top: 6px; font: 9px "SFMono-Regular", Consolas, monospace; }
 
-.empty-state { min-height: 480px; display: grid; place-content: center; text-align: center; border-block: 1px solid var(--line); }
-.empty-state h2 { margin: 0; font-size: clamp(35px, 6vw, 70px); letter-spacing: -.055em; font-weight: 500; }
-.empty-state > p:last-child { max-width: 510px; color: var(--muted-text); line-height: 1.6; }
+.empty-state { min-height: 480px; display: grid; place-content: center; padding: 56px 18px 76px; text-align: center; }
+.empty-state .eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; color: var(--faint); }
+.empty-state .eyebrow::before { width: 6px; height: 6px; border-radius: 1px; background: var(--signal); box-shadow: 0 0 12px var(--signal); content: ''; }
+.empty-state h2 { margin: 0; font-size: clamp(30px, 5vw, 58px); letter-spacing: -.05em; font-weight: 500; }
+.empty-state > p:last-child { max-width: 460px; margin: 16px auto 0; color: var(--muted-text); line-height: 1.55; text-wrap: balance; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
 @media (min-width: 621px) {

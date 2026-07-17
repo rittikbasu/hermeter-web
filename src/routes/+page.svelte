@@ -198,17 +198,17 @@
     {#if summary.calls === 0}
       <section class="empty-state">
         {#if coverage.state === 'unavailable'}
-          <p class="eyebrow">range not covered</p>
-          <h2>no data yet.</h2>
-          <p>known coverage runs from {coverage.fromDay ?? 'no date yet'} through {coverage.throughDay ?? 'no date yet'}; this range is unknown, not zero.</p>
+          <p class="eyebrow">not measured</p>
+          <h2>no coverage here yet.</h2>
+          <p>hermeter has not measured this selected range, so it cannot be treated as zero.</p>
         {:else if coverage.state === 'partial'}
-          <p class="eyebrow">range partially covered</p>
-          <h2>no measured usage yet.</h2>
-          <p>no usage was found in the covered portion from {coverage.fromDay ?? 'no date yet'} through {coverage.throughDay ?? 'no date yet'}; the rest remains unknown.</p>
+          <p class="eyebrow">partial coverage</p>
+          <h2>nothing measured so far.</h2>
+          <p>no usage was found in the measured part of this range. activity outside that window is still unknown.</p>
         {:else}
-          <p class="eyebrow">measured zero usage</p>
+          <p class="eyebrow">fully measured</p>
           <h2>this range is quiet.</h2>
-          <p>the publisher covered this range and found no usage events between {data.dashboard.range.from} and {data.dashboard.range.to}.</p>
+          <p>hermeter measured the full selected range and found no usage events.</p>
         {/if}
       </section>
     {:else}
