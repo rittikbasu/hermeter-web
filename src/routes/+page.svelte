@@ -239,7 +239,7 @@
       <section class="primary-grid">
         <article class="panel trend-panel">
           <div class="panel-head">
-            <div><h2>cost pulse</h2></div>
+            <div><h2>daily spend</h2></div>
             <p>{formatRangeDay(data.dashboard.range.from)}<span>→</span>{formatRangeDay(data.dashboard.range.to)}</p>
           </div>
           <div class="trend-chart" aria-hidden="true">
@@ -265,7 +265,7 @@
         </article>
 
         <article class="panel hourly-panel">
-          <div class="panel-head"><div><h2>hourly rhythm</h2></div><p>api calls · ist</p></div>
+          <div class="panel-head"><div><h2>hourly activity</h2></div><p>api calls · ist</p></div>
           <div class="bar-chart hourly-chart" aria-hidden="true">
             <BarChart data={hours} config={callsConfig} margins={{ top: 18, right: 12, bottom: 28, left: 45 }} bloom="low">
               <Grid strokeDasharray="2 5" />

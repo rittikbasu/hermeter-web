@@ -71,7 +71,7 @@ main { padding: 22px 0 48px; }
 .breakdown-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 14px; margin-top: 14px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; min-width: 0; }
 .panel-head { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line-soft); }
-.panel-head h2 { margin: 0; font-size: 18px; font-weight: 590; letter-spacing: -.025em; }
+.panel-head h2 { margin: 0; font: 400 18px/1.1 "Geist Pixel Square", sans-serif; letter-spacing: -.02em; }
 .panel-head .eyebrow { margin-bottom: 5px; color: var(--faint); }
 .panel-head > p { margin: 4px 0 0; color: var(--faint); font: 10px "SFMono-Regular", Consolas, monospace; }
 .panel-head > p span { padding: 0 6px; }
