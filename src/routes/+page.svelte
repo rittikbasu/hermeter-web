@@ -156,6 +156,7 @@
 <svelte:head>
   <title>hermeter</title>
   <meta name="description" content="hermes usage and cost dashboard" />
+  <link rel="preload" href="/fonts/geist-pixel/GeistPixel-Square.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="icon" type="image/svg+xml" href={faviconHref} />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Geist Pixel Square";
+  src: url("/fonts/geist-pixel/GeistPixel-Square.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   font-family: "Aptos", "Segoe UI Variable", "Helvetica Neue", sans-serif;
@@ -36,7 +44,7 @@ body::before {
 .topbar { height: 72px; display: flex; align-items: center; justify-content: space-between; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; letter-spacing: -.025em; }
 .brand-avatar { width: 28px; height: 28px; flex: none; }
-.brand strong { display: block; font-size: 24px; font-weight: 680; line-height: 28px; }
+.brand strong { display: block; font: 400 24px/28px "Geist Pixel Square", sans-serif; letter-spacing: -.025em; }
 .freshness { height: 28px; display: flex; align-items: center; color: var(--muted-text); font: 11px/1 "SFMono-Regular", Consolas, monospace; white-space: nowrap; }
 
 main { padding: 22px 0 48px; }
@@ -117,7 +125,7 @@ main { padding: 22px 0 48px; }
 .empty-state { min-height: 480px; display: grid; place-content: center; padding: 56px 18px 76px; text-align: center; }
 .empty-state .eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; color: var(--faint); }
 .empty-state .eyebrow::before { width: 6px; height: 6px; border-radius: 1px; background: var(--signal); box-shadow: 0 0 12px var(--signal); content: ''; }
-.empty-state h2 { margin: 0; font-size: clamp(30px, 5vw, 58px); letter-spacing: -.05em; font-weight: 500; }
+.empty-state h2 { margin: 0; font: 400 clamp(30px, 5vw, 58px)/1.05 "Geist Pixel Square", sans-serif; letter-spacing: -.035em; }
 .empty-state > p:last-child { max-width: 460px; margin: 16px auto 0; color: var(--muted-text); line-height: 1.55; text-wrap: balance; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
