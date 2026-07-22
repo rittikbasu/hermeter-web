@@ -156,7 +156,6 @@ main { padding: 22px 0 48px; }
   .desktop-subtotal { display: none; }
   .mobile-subtotal { display: inline; }
   .panel-head { padding: 16px; }
-  .trend-panel { min-height: 365px; }
   .trend-chart { height: 250px; padding: 8px 6px 10px; }
   .hourly-chart { padding-inline: 4px; }
   .breakdown-key { padding: 0 16px 16px; }
