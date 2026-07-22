@@ -35,6 +35,15 @@ export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+export function formatTooltipDay(day: string): string {
+  return `${day.slice(8, 10)}-${day.slice(5, 7)}-${day.slice(0, 4)}`;
+}
+
+export function formatTooltipHour(hour: number): string {
+  const period = hour < 12 ? 'am' : 'pm';
+  return `${hour % 12 || 12}:00 ${period}`;
+}
+
 export function formatTimestamp(value: number): string {
   if (!value) return 'not synced';
   return new Intl.DateTimeFormat('en-IN', {

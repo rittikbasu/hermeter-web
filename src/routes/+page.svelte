@@ -17,7 +17,16 @@
   import { PALETTE, rgb, type DitherColor, type Rgb } from '$lib/components/dither-kit/palette';
   import * as Select from '$lib/components/ui/select/index.js';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
-  import { formatMobileSubtotal, formatMoney, formatNumber, formatPercent, formatTimestamp, formatTokens } from '$lib/format';
+  import {
+    formatMobileSubtotal,
+    formatMoney,
+    formatNumber,
+    formatPercent,
+    formatTimestamp,
+    formatTokens,
+    formatTooltipDay,
+    formatTooltipHour
+  } from '$lib/format';
   import { fetchStatusVersion } from '$lib/status';
   import type { PageData } from './$types';
 
@@ -55,6 +64,7 @@
   const spendSeries = $derived(daily.map((item) => ({
     day: item.day,
     label: `${item.day.slice(8, 10)}/${item.day.slice(5, 7)}`,
+    tooltipLabel: formatTooltipDay(item.day),
     spend: item.knownCostNanos / 1_000_000_000
   })));
   const spendConfig = $derived({ spend: { label: 'spend', color: primaryColor } });
@@ -63,6 +73,7 @@
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
     hour,
     label: String(hour).padStart(2, '0'),
+    tooltipLabel: formatTooltipHour(hour),
     calls: hourlyByHour.get(hour)?.calls ?? 0
   })));
   const modelSeries = $derived(models.slice(0, 8).map((item) => ({
@@ -127,9 +138,6 @@
     return Number.isInteger(value) ? formatNumber(value) : '';
   }
 
-  function formatRangeDay(value: string): string {
-    return `${value.slice(8, 10)}-${value.slice(5, 7)}-${value.slice(0, 4)}`;
-  }
 
   async function applyRange(range: DateRange): Promise<void> {
     await goto(`/?from=${range.from}&to=${range.to}`, { noScroll: true, keepFocus: true });
@@ -240,7 +248,7 @@
         <article class="panel trend-panel">
           <div class="panel-head">
             <div><h2>daily spend</h2></div>
-            <p>{formatRangeDay(data.dashboard.range.from)}<span>→</span>{formatRangeDay(data.dashboard.range.to)}</p>
+            <p>{formatTooltipDay(data.dashboard.range.from)}<span>→</span>{formatTooltipDay(data.dashboard.range.to)}</p>
           </div>
           <div class="trend-chart" aria-hidden="true">
             <AreaChart
@@ -254,7 +262,7 @@
               <XAxis dataKey="label" maxTicks={7} />
               <YAxis tickCount={4} tickFormatter={formatChartMoney} />
               <Area dataKey="spend" variant="dotted" />
-              <Tooltip labelKey="day" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+              <Tooltip labelKey="tooltipLabel" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
             </AreaChart>
           </div>
           <table class="sr-only">
@@ -272,7 +280,7 @@
               <XAxis dataKey="label" maxTicks={6} />
               <YAxis tickCount={4} tickFormatter={formatChartCalls} />
               <Bar dataKey="calls" variant="dotted" />
-              <Tooltip labelKey="label" valueFormatter={(value) => `${formatNumber(value)} calls`} />
+              <Tooltip labelKey="tooltipLabel" valueFormatter={(value) => `${formatNumber(value)} calls`} />
             </BarChart>
           </div>
           <table class="sr-only">
