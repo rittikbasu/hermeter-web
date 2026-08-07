@@ -8,6 +8,7 @@ export type DashboardData = {
     processedTokens: number;
     knownCostNanos: number;
     incompleteEvents: number;
+    apiEquivalentEvents: number;
     cacheRate: number;
   };
   daily: Array<Record<string, string | number>>;
@@ -37,7 +38,8 @@ const SQL = [
     COALESCE(SUM(cached_input_tokens), 0) AS cachedInputTokens,
     COALESCE(SUM(output_tokens), 0) AS outputTokens,
     COALESCE(SUM(known_cost_nanos), 0) AS knownCostNanos,
-    COALESCE(SUM(cost_status != 'complete'), 0) AS incompleteEvents
+    COALESCE(SUM(cost_status != 'complete'), 0) AS incompleteEvents,
+    COALESCE(SUM(pricing_confidence = 'api_equivalent'), 0) AS apiEquivalentEvents
    FROM usage_events WHERE ${RANGE}`,
   `SELECT
     local_day AS day,
@@ -46,7 +48,8 @@ const SQL = [
     SUM(cached_input_tokens) AS cachedInputTokens,
     SUM(output_tokens) AS outputTokens,
     SUM(known_cost_nanos) AS knownCostNanos,
-    SUM(cost_status != 'complete') AS incompleteEvents
+    SUM(cost_status != 'complete') AS incompleteEvents,
+    SUM(pricing_confidence = 'api_equivalent') AS apiEquivalentEvents
    FROM usage_events WHERE ${RANGE}
    GROUP BY local_day ORDER BY local_day`,
   `SELECT
@@ -192,7 +195,7 @@ function fillDaily(
   while (true) {
     output.push(byDay.get(day) ?? {
       day, calls: 0, inputTokens: 0, cachedInputTokens: 0,
-      outputTokens: 0, knownCostNanos: 0, incompleteEvents: 0
+      outputTokens: 0, knownCostNanos: 0, incompleteEvents: 0, apiEquivalentEvents: 0
     });
     if (day === end) break;
     day = nextDay(day);
@@ -250,6 +253,7 @@ export async function loadDashboard(
       processedTokens: inputTokens + outputTokens,
       knownCostNanos: rowNumber(rawSummary, 'knownCostNanos'),
       incompleteEvents: rowNumber(rawSummary, 'incompleteEvents'),
+      apiEquivalentEvents: rowNumber(rawSummary, 'apiEquivalentEvents'),
       cacheRate: inputTokens ? (cachedInputTokens / inputTokens) * 100 : 0
     },
     daily,

@@ -7,7 +7,7 @@ const HEARTBEAT_FIELDS = new Set([
 const SESSION_FIELDS = new Set(['sessionKey', 'title']);
 const BUCKET_FIELDS = new Set([
   'day', 'hour', 'provider', 'model', 'source', 'sessionKey', 'calls', 'inputTokens',
-  'cachedInputTokens', 'outputTokens', 'knownCostNanos', 'incompleteEvents'
+  'cachedInputTokens', 'outputTokens', 'knownCostNanos', 'incompleteEvents', 'apiEquivalentEvents'
 ]);
 const SESSION_ID = /^s_[A-Za-z0-9_-]{2,64}$/;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -54,6 +54,7 @@ export type SnapshotBucket = {
   outputTokens: number;
   knownCostNanos: number;
   incompleteEvents: number;
+  apiEquivalentEvents?: number;
 };
 
 export type DashboardSnapshot = {
@@ -168,6 +169,12 @@ function parseBucket(value: unknown): SnapshotBucket {
   if (cachedInputTokens > inputTokens) throw new Error('cachedInputTokens exceeds inputTokens');
   const incompleteEvents = integer(item.incompleteEvents, 'incompleteEvents');
   if (incompleteEvents > calls) throw new Error('incompleteEvents exceeds calls');
+  const apiEquivalentEvents = item.apiEquivalentEvents === undefined
+    ? undefined
+    : integer(item.apiEquivalentEvents, 'apiEquivalentEvents');
+  if (apiEquivalentEvents !== undefined && apiEquivalentEvents > calls) {
+    throw new Error('apiEquivalentEvents exceeds calls');
+  }
   return {
     day: validDay(item.day),
     hour,
@@ -180,7 +187,8 @@ function parseBucket(value: unknown): SnapshotBucket {
     cachedInputTokens,
     outputTokens: integer(item.outputTokens, 'outputTokens'),
     knownCostNanos: integer(item.knownCostNanos, 'knownCostNanos'),
-    incompleteEvents
+    incompleteEvents,
+    ...(apiEquivalentEvents === undefined ? {} : { apiEquivalentEvents })
   };
 }
 
@@ -223,7 +231,7 @@ export function parseSnapshot(value: unknown): DashboardSnapshot {
   const bucketKeys = new Set<string>();
   const aggregateFields = [
     'calls', 'inputTokens', 'cachedInputTokens', 'outputTokens',
-    'knownCostNanos', 'incompleteEvents'
+    'knownCostNanos', 'incompleteEvents', 'apiEquivalentEvents'
   ] as const;
   const totals: Record<(typeof aggregateFields)[number], number> = {
     calls: 0,
@@ -231,7 +239,8 @@ export function parseSnapshot(value: unknown): DashboardSnapshot {
     cachedInputTokens: 0,
     outputTokens: 0,
     knownCostNanos: 0,
-    incompleteEvents: 0
+    incompleteEvents: 0,
+    apiEquivalentEvents: 0
   };
   for (const bucket of buckets) {
     const bucketStartMs = hourStartInKolkata(bucket.day, bucket.hour);
@@ -241,7 +250,7 @@ export function parseSnapshot(value: unknown): DashboardSnapshot {
     }
     if (!sessionKeys.has(bucket.sessionKey)) throw new Error('bucket references undeclared session');
     for (const field of aggregateFields) {
-      totals[field] = addSafeTotal(totals[field], bucket[field], field);
+      totals[field] = addSafeTotal(totals[field], bucket[field] ?? 0, field);
     }
     const key = JSON.stringify([
       bucket.day, bucket.hour, bucket.provider, bucket.model, bucket.source, bucket.sessionKey

@@ -16,7 +16,8 @@ const snapshot: DashboardSnapshot = {
     {
       day: '2026-07-15', hour: 12, provider: 'openai', model: 'gpt-5.6-sol',
       source: 'telegram', sessionKey: 's_one', calls: 2, inputTokens: 100,
-      cachedInputTokens: 80, outputTokens: 10, knownCostNanos: 1000, incompleteEvents: 0
+      cachedInputTokens: 80, outputTokens: 10, knownCostNanos: 1000, incompleteEvents: 0,
+      apiEquivalentEvents: 2
     },
     {
       day: '2026-07-16', hour: 12, provider: 'openai', model: 'gpt-5.6-sol',
@@ -43,6 +44,7 @@ describe('loadDashboardFromSnapshot', () => {
       processedTokens: 132,
       knownCostNanos: 3500,
       incompleteEvents: 1,
+      apiEquivalentEvents: 2,
       cacheRate: 75
     });
     expect(data.daily).toEqual([

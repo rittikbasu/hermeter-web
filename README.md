@@ -77,6 +77,7 @@ the canonical deployment is private behind cloudflare access:
 
 - dashboard routes require the allowed human identity.
 - `/api/ingest` requires a scoped access service token.
-- `workers.dev` and preview urls are disabled in `wrangler.jsonc`, leaving the access-protected custom domain as the public route.
+- the custom domain is canonical when available. `workers.dev` remains enabled as a recovery hostname for a suspended or expired custom domain and must be protected by the same Cloudflare Access application before it is treated as usable.
+- preview urls remain disabled.
 
 the app intentionally has no session or account system of its own. deployments on another domain must recreate both edge policies before accepting real data.

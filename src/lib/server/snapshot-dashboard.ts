@@ -46,12 +46,13 @@ type Totals = {
   outputTokens: number;
   knownCostNanos: number;
   incompleteEvents: number;
+  apiEquivalentEvents: number;
 };
 
 function emptyTotals(): Totals {
   return {
     calls: 0, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0,
-    knownCostNanos: 0, incompleteEvents: 0
+    knownCostNanos: 0, incompleteEvents: 0, apiEquivalentEvents: 0
   };
 }
 
@@ -62,6 +63,7 @@ function addTotals(target: Totals, bucket: SnapshotBucket): void {
   target.outputTokens += bucket.outputTokens;
   target.knownCostNanos += bucket.knownCostNanos;
   target.incompleteEvents += bucket.incompleteEvents;
+  target.apiEquivalentEvents += bucket.apiEquivalentEvents || 0;
 }
 
 type RankedCount = { calls: number; knownCostNanos: number };
