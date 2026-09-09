@@ -79,9 +79,6 @@ export function startCartesianLoop({
       if (!cur) return
       const seed = s.seedOf(key)
       const variant = s.seriesSpecs[key]?.variant ?? "gradient"
-      const isLine =
-        (s.seriesSpecs[key]?.kind ??
-          (s.chartType === "line" ? "line" : "area")) === "line"
       const emphasis = s.selectedDataKey ?? s.focusDataKey
       const dim = emphasis !== null && emphasis !== key ? 0.3 : 1
       // Overlapping (non-stacked) layers thin out front-to-back so they
@@ -93,7 +90,7 @@ export function startCartesianLoop({
           variant,
           intensity,
           dim,
-          stacked: stacked && !isLine,
+          stacked,
           sparse,
         })
       }
@@ -106,7 +103,6 @@ export function startCartesianLoop({
   let animStart = 0
   let lastProg = -1
   let lastRevision = state.current.revision
-  let entranceReported = !animate
   let intensity = 0
   let needsFill = true
   let lastPaintSig = ""
@@ -123,16 +119,10 @@ export function startCartesianLoop({
       lastRevision = s.revision
       animStart = 0 // re-play the entrance on data change / replay
       lastProg = -1
-      entranceReported = false
     }
     if (!animStart) animStart = now
     const prog = animate ? Math.min(1, (now - animStart) / duration) : 1
     const progChanged = prog !== lastProg
-    // Tell the context the reveal is done so DOM markers fade in in sync.
-    if (prog >= 1 && !entranceReported) {
-      entranceReported = true
-      s.markEntranceDone()
-    }
 
     let moving = false
     for (const key of s.configKeys) {
@@ -254,6 +244,7 @@ export function startCartesianLoop({
       if (sx > revealCols) continue // behind the reveal front
       const top = cur.top[sx] ?? 0
       const floor = cur.floor[sx] ?? rows - 1
+      if (floor <= top) continue
       const sy = Math.round(top + star.depth * (floor - top))
       const tw = reduce ? 0.85 : (Math.sin((tick + star.phase) * 0.35) + 1) / 2
       const lift = tw * (0.7 + 0.3 * intensity)

@@ -7,7 +7,8 @@ a small usage dashboard for hermeter. it reads one sanitized aggregate snapshot 
 ## what it shows
 
 - known spend, api calls, processed tokens, and cache coverage
-- daily spend and hourly activity
+- daily spend or token usage and hourly activity
+- token usage shows total input, the uncached remainder as an in-bar cap, and output as a thin top marker; hover details retain exact token counts
 - model, source, and expensive-session breakdowns with selected display titles
 - presets and bounded arbitrary date ranges (up to 3,660 inclusive days)
 - complete, partial, stale, and unavailable coverage states

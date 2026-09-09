@@ -2,23 +2,35 @@
   import { onMount } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';
   import DateRangeField from '$lib/components/date-range-field.svelte';
+  import DailyTokenChart from '$lib/components/daily-token-chart.svelte';
   import Avatar from '$lib/components/dither-kit/avatar.svelte';
   import AreaChart from '$lib/components/dither-kit/area-chart.svelte';
   import Area from '$lib/components/dither-kit/area.svelte';
   import BarChart from '$lib/components/dither-kit/bar-chart.svelte';
   import Bar from '$lib/components/dither-kit/bar.svelte';
   import Grid from '$lib/components/dither-kit/grid.svelte';
+
   import ProgressLine from '$lib/components/dither-kit/progress-line.svelte';
   import PieChart from '$lib/components/dither-kit/pie-chart.svelte';
   import Pie from '$lib/components/dither-kit/pie.svelte';
   import Tooltip from '$lib/components/dither-kit/tooltip.svelte';
+  import type { ChartConfig } from '$lib/components/dither-kit/chart-context.svelte';
   import XAxis from '$lib/components/dither-kit/x-axis.svelte';
   import YAxis from '$lib/components/dither-kit/y-axis.svelte';
   import { PALETTE, rgb, type DitherColor, type Rgb } from '$lib/components/dither-kit/palette';
   import * as Select from '$lib/components/ui/select/index.js';
+  import {
+    DEFAULT_DAILY_CHART_METRIC,
+    dailyChartSeries,
+    dailyTokenSeries as buildDailyTokenSeries,
+    formatDailyAxisLabel,
+    type DailyChartMetric
+  } from '$lib/daily-chart';
+  import { dailyTokenColors as colorsForPrimary } from '$lib/daily-token-colors';
   import { presetForRange, rangeForPreset, type DateRange, type RangePreset } from '$lib/date';
   import {
     formatMobileSubtotal,
+    formatExactTokens,
     formatMoney,
     formatNumber,
     formatPercent,
@@ -32,7 +44,14 @@
 
   let { data }: { data: PageData } = $props();
 
-  type Daily = { day: string; calls: number; knownCostNanos: number };
+  type Daily = {
+    day: string;
+    calls: number;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    knownCostNanos: number;
+  };
   type Hourly = { hour: number; calls: number; knownCostNanos: number };
   type Breakdown = { source?: string; provider?: string; model?: string; calls: number; processedTokens: number; knownCostNanos: number };
   type Session = { label: string; source: string; calls: number; knownCostNanos: number };
@@ -45,6 +64,8 @@
   const sessions = $derived(data.dashboard.sessions as Session[]);
   const status = $derived(data.dashboard.status);
   const coverage = $derived(data.dashboard.coverage);
+
+  let dailyMetric = $state<DailyChartMetric>(DEFAULT_DAILY_CHART_METRIC);
 
   function updatedTime(value: number): string {
     if (!value) return 'waiting for sync';
@@ -61,13 +82,24 @@
   // svelte-ignore state_referenced_locally
   let primaryColor = $state<DitherColor>(data.theme.primaryColor);
 
-  const spendSeries = $derived(daily.map((item) => ({
+  const dailyChartTitle = $derived(dailyMetric === 'cost' ? 'daily spend' : 'daily tokens');
+  const dailyAxisSpansYears = $derived(new Set(daily.map((item) => item.day.slice(0, 4))).size > 1);
+  const dailySpendSeries = $derived(daily.map((item) => ({
     day: item.day,
-    label: `${item.day.slice(8, 10)}/${item.day.slice(5, 7)}`,
+    label: formatDailyAxisLabel(item.day, dailyAxisSpansYears),
     tooltipLabel: formatTooltipDay(item.day),
-    spend: item.knownCostNanos / 1_000_000_000
+    ...dailyChartSeries(item, 'cost')
   })));
-  const spendConfig = $derived({ spend: { label: 'spend', color: primaryColor } });
+  const dailyTokenSeries = $derived(daily.map((item) => ({
+    day: item.day,
+    label: formatDailyAxisLabel(item.day, dailyAxisSpansYears),
+    tooltipLabel: formatTooltipDay(item.day),
+    ...buildDailyTokenSeries(item)
+  })));
+  const dailyTokenColors = $derived(colorsForPrimary(primaryColor));
+  const dailyConfig = $derived.by((): ChartConfig => {
+    return { value: { label: 'cost', color: primaryColor } };
+  });
 
   const hourlyByHour = $derived(new Map(hourly.map((item) => [item.hour, item])));
   const hours = $derived.by(() => Array.from({ length: 24 }, (_, hour) => ({
@@ -118,6 +150,10 @@
     { value: 'month', label: 'this month' },
     { value: 'all', label: 'all time' }
   ];
+  const dailyMetricOptions: Array<{ value: DailyChartMetric; label: string }> = [
+    { value: 'cost', label: 'cost' },
+    { value: 'tokens', label: 'tokens' }
+  ];
   const activePreset = $derived(presetForRange(data.dashboard.range, data.bounds));
   const activePresetLabel = $derived(
     activePreset === 'custom'
@@ -136,6 +172,19 @@
 
   function formatChartCalls(value: number): string {
     return Number.isInteger(value) ? formatNumber(value) : '';
+  }
+
+  function formatDailyChartTick(value: number): string {
+    return formatChartMoney(value);
+  }
+
+  function formatDailyChartValue(value: number | null): string {
+    if (value === null) return '—';
+    return dailyMetric === 'tokens' ? formatExactTokens(value) : formatMoney(value * 1_000_000_000);
+  }
+
+  function setDailyMetric(metric: DailyChartMetric): void {
+    dailyMetric = metric;
   }
 
 
@@ -240,35 +289,69 @@
         <article>
           <p>cache coverage</p>
           <strong>{formatPercent(summary.cacheRate)}</strong>
-          <small>{formatTokens(summary.cachedInputTokens)} cached input</small>
+          <small>{formatTokens(summary.cachedInputTokens)} cached</small>
         </article>
       </section>
 
       <section class="primary-grid">
         <article class="panel trend-panel">
           <div class="panel-head">
-            <div><h2>daily spend</h2></div>
-            <p>{formatTooltipDay(data.dashboard.range.from)}<span>→</span>{formatTooltipDay(data.dashboard.range.to)}</p>
+            <div><h2>{dailyChartTitle}</h2></div>
+            <div class="daily-metric-toggle" role="group" aria-label="daily chart metric">
+              {#each dailyMetricOptions as option}
+                <button
+                  type="button"
+                  aria-pressed={dailyMetric === option.value}
+                  onclick={() => setDailyMetric(option.value)}
+                >{option.label}</button>
+              {/each}
+            </div>
           </div>
           <div class="trend-chart" aria-hidden="true">
-            <AreaChart
-              data={spendSeries}
-              config={spendConfig}
-              margins={{ top: 18, right: 18, bottom: 28, left: 54 }}
-              bloom="low"
-              animationDuration={650}
-            >
-              <Grid strokeDasharray="2 5" />
-              <XAxis dataKey="label" maxTicks={7} />
-              <YAxis tickCount={4} tickFormatter={formatChartMoney} />
-              <Area dataKey="spend" variant="dotted" />
-              <Tooltip labelKey="tooltipLabel" valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
-            </AreaChart>
+            {#if dailyMetric === 'tokens'}
+              <DailyTokenChart
+                data={dailyTokenSeries}
+                primaryColor={primaryColor}
+                uncachedColor={dailyTokenColors.uncached}
+                cacheRateColor={dailyTokenColors.cacheRate}
+                outputColor={dailyTokenColors.output}
+              />
+            {:else}
+              <AreaChart
+                data={dailySpendSeries}
+                config={dailyConfig}
+                margins={{ top: 18, right: 18, bottom: 28, left: 54 }}
+                bloom="low"
+                animationDuration={650}
+              >
+                <Grid strokeDasharray="2 5" />
+                <XAxis dataKey="label" maxTicks={7} />
+                <YAxis tickCount={4} tickFormatter={formatDailyChartTick} />
+                <Area dataKey="value" variant="dotted" />
+                <Tooltip labelKey="tooltipLabel" valueFormatter={formatDailyChartValue} />
+              </AreaChart>
+            {/if}
           </div>
           <table class="sr-only">
-            <caption>spend by day</caption>
-            <thead><tr><th>day</th><th>spend</th></tr></thead>
-            <tbody>{#each daily as item}<tr><td>{item.day}</td><td>{formatMoney(item.knownCostNanos)}</td></tr>{/each}</tbody>
+            {#if dailyMetric === 'tokens'}
+              <caption>daily tokens by day; uncached input is the visible cap; output is the thin colored marker at the input top edge</caption>
+              <thead><tr><th>day</th><th>input</th><th>uncached input</th><th>cache coverage</th><th>output</th></tr></thead>
+              <tbody>
+                {#each daily as item}
+                  <tr>
+                    <td>{item.day}</td>
+                    <td>{formatDailyChartValue(item.inputTokens)}</td>
+                    <td>{formatDailyChartValue(item.inputTokens - item.cachedInputTokens)}</td>
+                    <td>{item.inputTokens === 0 ? '—' : formatPercent((item.cachedInputTokens / item.inputTokens) * 100)}</td>
+                    <td>{formatDailyChartValue(item.outputTokens)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            {:else}
+              <caption>daily spend by day</caption>
+              <thead><tr><th>day</th><th>cost</th></tr></thead>
+              <tbody>{#each daily as item}<tr><td>{item.day}</td><td>{formatMoney(item.knownCostNanos)}</td></tr>{/each}</tbody>
+            {/if}
           </table>
         </article>
 
@@ -280,7 +363,7 @@
               <XAxis dataKey="label" maxTicks={6} />
               <YAxis tickCount={4} tickFormatter={formatChartCalls} />
               <Bar dataKey="calls" variant="dotted" />
-              <Tooltip labelKey="tooltipLabel" valueFormatter={(value) => `${formatNumber(value)} calls`} />
+              <Tooltip labelKey="tooltipLabel" valueFormatter={(value) => value === null ? '—' : `${formatNumber(value)} calls`} />
             </BarChart>
           </div>
           <table class="sr-only">
@@ -320,7 +403,7 @@
                 bloom="low"
               >
                 <Pie variant="dotted" />
-                <Tooltip valueFormatter={(value) => formatMoney(value * 1_000_000_000)} />
+                <Tooltip valueFormatter={(value) => value === null ? '—' : formatMoney(value * 1_000_000_000)} />
               </PieChart>
             </div>
             <ul class="breakdown-key source-key" aria-label="source totals">

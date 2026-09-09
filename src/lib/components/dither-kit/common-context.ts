@@ -5,7 +5,7 @@ import type { Seed } from "./palette"
 export type TooltipItem = {
   name: string
   label: string
-  value: number
+  value: number | null
   seed: Seed
   dimmed: boolean
 }
@@ -31,6 +31,7 @@ export type CommonChart = {
   itemsAt: (index: number) => TooltipItem[]
   ready: boolean
   tooltipLeft: number // clamped px for the floating tooltip
+  tooltipAlign: "start" | "center" | "end"
   tooltipTop: number // px - follows the hovered node (cartesian) / cursor (polar)
 }
 

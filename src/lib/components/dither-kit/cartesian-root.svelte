@@ -35,6 +35,8 @@
     Canvas,
     data,
     config,
+    tooltipConfig,
+    domainMax,
     children,
     stackType = "default",
     margins: marginsProp,
@@ -65,6 +67,8 @@
       // Safe: the controller only reads row[key] for the configured series keys.
       data: data as Record<string, unknown>[],
       config,
+      tooltipConfig,
+      domainMax,
       stackType,
       dimensions: { width: dims.width, height: dims.height },
       margins,

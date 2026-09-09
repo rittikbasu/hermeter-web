@@ -2,6 +2,7 @@
   import { untrack } from "svelte"
   import { startCartesianLoop, type Star, type Surface } from "./cartesian-loop"
   import { useChart } from "./chart-context.svelte"
+  import { surfaceForBand } from "./cartesian-surfaces"
   import { backingSize, bloomLayerStyle, resample } from "./dither-paint"
 
   /**
@@ -25,18 +26,17 @@
     const out: Record<string, Surface> = {}
     if (!ctx.ready) return out
     const h = ctx.plot.height || 1
-    const glow = Math.max(6, Math.round(rows * 0.16))
+    const lineGlow = Math.max(4, Math.round(rows * 0.08))
     const defaultKind = ctx.chartType === "line" ? "line" : "area"
     for (const key of ctx.configKeys) {
       const band = ctx.bands[key]
       if (!band) continue
       const line = (ctx.seriesSpecs[key]?.kind ?? defaultKind) === "line"
-      const top = band.map((b) => (ctx.y(b[1]) / h) * (rows - 1))
-      const floor = band.map((b, i) =>
-        line
-          ? Math.min(rows - 1, top[i] + glow)
-          : (ctx.y(b[0]) / h) * (rows - 1)
+      const surfaces = band.map((b) =>
+        surfaceForBand(b, line ? "line" : "area", ctx.y, h, rows, lineGlow)
       )
+      const top = surfaces.map((surface) => surface.top)
+      const floor = surfaces.map((surface) => surface.floor)
       out[key] = { top: resample(top, cols), floor: resample(floor, cols) }
     }
     return out

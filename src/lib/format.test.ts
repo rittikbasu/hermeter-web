@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatMobileSubtotal,
   formatMoney,
+  formatExactTokens,
   formatTokens,
   formatTooltipDay,
   formatTooltipHour
@@ -20,6 +21,11 @@ describe('dashboard formatting', () => {
   it('formats large token counts compactly', () => {
     expect(formatTokens(1_740_000_000)).toBe('1.74B');
     expect(formatTokens(254_790_000)).toBe('254.79M');
+  });
+
+  it('keeps token values exact for tooltip and table display', () => {
+    expect(formatExactTokens(2_450)).toBe('2,450 tokens');
+    expect(formatExactTokens(1_000_001)).toBe('1,000,001 tokens');
   });
 
   it('formats tooltip dates as dd-mm-yyyy', () => {

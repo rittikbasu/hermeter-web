@@ -18,7 +18,10 @@ import {
 /** Which chart root a part is composed under - drives the boundary guards. */
 export type ChartType = "area" | "bar" | "line" | "pie" | "radar"
 
-export type ChartConfig = Record<string, { label?: string; color: DitherColor }>
+export type ChartConfig = Record<string, {
+  label?: string
+  color: DitherColor
+}>
 
 export type Margins = {
   top: number
@@ -28,6 +31,11 @@ export type Margins = {
 }
 
 type Row = Record<string, unknown>
+
+type ChartRevision = {
+  data: Row[]
+  token: number
+}
 
 export type AreaVariant = "gradient" | "dotted" | "hatched" | "solid"
 export type StrokeVariant = "solid" | "dashed"
@@ -46,6 +54,8 @@ export type SeriesSpec = {
 export type CartesianChartProps<TData extends object = Row> = {
   data: TData[]
   config: ChartConfig
+  tooltipConfig?: ChartConfig
+  domainMax?: number
   children?: Snippet
   stackType?: StackType
   margins?: Partial<Margins>
@@ -86,6 +96,8 @@ export type CartesianControllerInput = {
   chartType: ChartType
   data: Row[]
   config: ChartConfig
+  tooltipConfig?: ChartConfig
+  domainMax?: number
   stackType: StackType
   dimensions: Dimensions
   margins: Margins
@@ -152,8 +164,14 @@ export class CartesianChartState {
       get tooltipLeft() {
         return Math.max(
           48,
-          Math.min(self.plot.width + self.margins.left - 48, self.cursorX)
+          Math.min(self.plot.width + self.margins.left, self.cursorX)
         )
+      },
+      get tooltipAlign() {
+        const edge = self.plot.width + self.margins.left
+        if (self.cursorX < 96) return "start"
+        if (self.cursorX > edge - 96) return "end"
+        return "center"
       },
       // Follow the highest hovered node so the card rides the data path, but
       // keep enough headroom that the upward-lifted card never clips the top.
@@ -171,13 +189,13 @@ export class CartesianChartState {
       heading: (i, labelKey) =>
         labelKey ? String(self.data[i]?.[labelKey] ?? "") : null,
       itemsAt: (i) =>
-        self.configKeys.map((name) => {
+        Object.entries(self.tooltipConfig).map(([name, config]) => {
           const raw = self.data[i]?.[name]
           const emphasis = self.selectedDataKey ?? self.focusDataKey
           return {
             name,
-            label: self.config[name]?.label ?? name,
-            value: typeof raw === "number" ? raw : 0,
+            label: config?.label ?? name,
+            value: raw === null ? null : typeof raw === "number" ? raw : 0,
             seed: self.seedOf(name),
             dimmed: emphasis !== null && emphasis !== name,
           }
@@ -194,6 +212,12 @@ export class CartesianChartState {
   }
   get data() {
     return this.#in().data
+  }
+  get tooltipConfig() {
+    return this.#in().tooltipConfig ?? this.config
+  }
+  get domainMax() {
+    return this.#in().domainMax
   }
   get dataLength() {
     return this.#in().data.length
@@ -250,7 +274,7 @@ export class CartesianChartState {
     return this.#stack.bands
   }
   get max() {
-    return this.#stack.max
+    return Math.max(this.#stack.max, this.domainMax ?? 0)
   }
 
   #isBar = $derived(this.chartType === "bar")
@@ -290,42 +314,17 @@ export class CartesianChartState {
     }
   }
 
-  seedOf = (key: string): Seed => seedOfColor(this.config[key]?.color ?? "grey")
+  seedOf = (key: string): Seed =>
+    seedOfColor(this.config[key]?.color ?? this.tooltipConfig[key]?.color ?? "grey")
 
-  // `revision` bumps when the data changes identity or the replay token
-  // advances, so the canvas can re-play its entrance. The cache is
-  // non-reactive on purpose: every re-run that differs advances the counter.
-  #rev: { data: unknown; token: number | undefined; value: number } = {
-    data: undefined,
-    token: undefined,
-    value: -1,
-  }
-  revision = $derived.by(() => {
-    const data = this.#in().data
-    const token = this.#in().replayToken
-    if (this.#rev.data !== data || this.#rev.token !== token) {
-      this.#rev = { data, token, value: this.#rev.value + 1 }
-    }
-    return this.#rev.value
-  })
+  // A new data array is the chart's immutable update boundary; replayToken
+  // handles replays when the data itself is unchanged. Keeping both in one
+  // derived object avoids serializing every row during canvas animation.
+  revision = $derived.by((): ChartRevision => ({
+    data: this.#in().data,
+    token: this.#in().replayToken,
+  }))
 
-  // The entrance gate flips true when the canvas reveal completes so DOM
-  // markers fade in with the fill. The stamp is compared against the live
-  // `revision`, so a replay re-arms it automatically.
-  #entrance = $state<{ revision: number; done: boolean }>({
-    revision: -1,
-    done: false,
-  })
-  /** True once the entrance has played - gates SVG markers. */
-  get entranceDone() {
-    return this.#entrance.revision === this.revision
-      ? this.#entrance.done
-      : !this.animate
-  }
-  /** The canvas calls this when its reveal completes. */
-  markEntranceDone = () => {
-    this.#entrance = { revision: this.revision, done: true }
-  }
 
   // Interaction setters - arrow fields so they can be handed to parts/loops.
   selectDataKey = (key: string | null) => {

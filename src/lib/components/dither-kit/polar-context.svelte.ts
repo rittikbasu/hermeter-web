@@ -119,6 +119,9 @@ export class PolarChartState {
           Math.min(self.plot.width + self.margins.left - 48, self.cursorX)
         )
       },
+      get tooltipAlign() {
+        return "center" as const
+      },
       get tooltipTop() {
         return Math.max(self.margins.top + 44, self.cursorY)
       },

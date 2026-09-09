@@ -87,3 +87,16 @@ export function nearestIndex(px: number, length: number, plotWidth: number) {
   const t = Math.max(0, Math.min(1, px / plotWidth))
   return Math.round(t * (length - 1))
 }
+
+/** Evenly distributed axis indexes that always include both endpoints. */
+export function tickIndexes(length: number, maxTicks: number): number[] {
+  if (length <= 0 || maxTicks <= 0) return []
+  if (length <= maxTicks || maxTicks === 1) {
+    return Array.from({ length: Math.min(length, maxTicks) }, (_, i) => i)
+  }
+
+  const last = length - 1
+  return Array.from({ length: maxTicks }, (_, i) =>
+    Math.round((i * last) / (maxTicks - 1))
+  )
+}

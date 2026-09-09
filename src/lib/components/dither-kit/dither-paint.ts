@@ -24,7 +24,6 @@ export const BORDER_ALPHA = 0.72
 // between these two tiers of the *same* colour instead of leaving holes, so the
 // background never shows through as stark white on a light theme.
 export const OFF_TIER = 0.4
-
 export type PaintOpts = {
   variant: AreaVariant
   intensity: number // 0-1 hover lift
@@ -57,16 +56,18 @@ export function paintColumn(
   top: number,
   floor: number,
   seed: Seed,
-  { variant, intensity, dim, stacked, sparse = 0 }: PaintOpts
+  {
+    variant,
+    intensity,
+    dim,
+    stacked,
+    sparse = 0,
+  }: PaintOpts
 ) {
   const t = Math.round(top)
   const f = Math.round(floor)
   const depth = f - t
-  if (depth <= 0) {
-    octx.fillStyle = rgb(seed.fill, 1, BORDER_ALPHA * dim)
-    octx.fillRect(x, t, 1, 1)
-    return
-  }
+  if (depth <= 0) return
   const bias = (variant === "dotted" ? 0.12 : 0) + (stacked ? 0.2 : 0) - sparse
   for (let y = t; y < f; y++) {
     // Inverted falloff: 0 at the top line, 1 at the floor - dense at the

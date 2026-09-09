@@ -27,6 +27,10 @@ export function formatTokens(value: number): string {
   return String(value);
 }
 
+export function formatExactTokens(value: number): string {
+  return `${formatNumber(value)} tokens`;
+}
+
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
